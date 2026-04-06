@@ -23,6 +23,9 @@
 - ✅ 历史记录管理
 - ✅ 模型端点配置（支持 Ollama、OpenAI、Custom AI 等）
 - ✅ 可自定义提示词模板
+- ✅ 暂停/继续功能（OCR、翻译可独立控制）
+- ✅ 重新识别/翻译当前页
+- ✅ 捐赠支持
 
 ## 技术栈
 
@@ -39,10 +42,11 @@
 - **PyMuPDF** - PDF 处理
 - **Pillow** - 图像处理
 - **python-docx** - Word 文档生成
+- **httpx** - HTTP 客户端
 
 ### AI 模型（需自行配置）
 
-本系统支持 Ollama、OpenAI、Custom AI 等多种 AI 模型供应商。推荐使用支持视觉能力的模型进行 OCR 识别。
+本系统支持 Ollama、OpenAI、阿里云、DeepSeek、Google 等多种 AI 模型供应商。推荐使用支持视觉能力的模型进行 OCR 识别。
 
 详细模型选择建议请参考 [使用指南](xinda-frontend/public/usage.md) 中的模型配置说明。
 
@@ -66,6 +70,7 @@ xinda/
 │   ├── requirements.txt       # Python 依赖
 │   └── .env                   # 后端环境变量
 │
+├── package/                   # Windows 打包脚本
 ├── uploads/                   # 上传文件存储
 ├── data/                      # 数据库文件
 └── README.md                  # 项目文档
@@ -185,7 +190,13 @@ npm run dev
 - 中间显示识别出的外文文本
 - 右侧显示中文翻译
 
-### 6. 导出结果
+### 6. 暂停/继续
+
+- 处理过程中可暂停 OCR 或翻译任务
+- 暂停不影响其他任务继续进行
+- 暂停后更换模型，继续时使用新模型
+
+### 7. 导出结果
 
 - 在结果页面点击「导出」按钮
 - 可选择导出识别稿（外文原文）或翻译稿（中文）
@@ -208,6 +219,10 @@ npm run dev
 | GET | /api/export/{id}/translate | 导出翻译稿 |
 | GET | /api/providers | 获取模型供应商列表 |
 | POST | /api/prompts | 管理提示词配置 |
+| POST | /api/result/{id}/pause-ocr | 暂停 OCR |
+| POST | /api/result/{id}/resume-ocr | 继续 OCR |
+| POST | /api/result/{id}/pause-translate | 暂停翻译 |
+| POST | /api/result/{id}/resume-translate | 继续翻译 |
 
 ## 已知问题与限制
 
@@ -228,6 +243,17 @@ npm run dev
 2. **优化提示词**：根据实际处理结果持续调整提示词
 3. **分语种配置**：建议为每种常用语言设置专属提示词
 4. **监控处理效果**：定期检查识别和翻译质量，及时调整
+
+## Windows 打包分发
+
+项目提供了 Windows 打包脚本，可将应用打包为便携版 EXE：
+
+1. 将项目复制到 Windows 电脑
+2. 双击运行 `package/build-windows.bat`
+3. 等待打包完成，得到 `package/dist/xinda/` 文件夹
+4. 将该文件夹压缩成分发包
+
+用户解压后双击 `启动信达.bat` 即可使用。
 
 ## 许可证
 
