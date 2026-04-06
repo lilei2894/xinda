@@ -1,0 +1,40 @@
+@import "tailwindcss";
+
+/* Warm background for entire app */
+html, body {
+  background-color: #faf8f2 !important;
+}
+
+/* Override common Tailwind backgrounds with warm colors */
+.bg-gray-50:not(.panel-header), 
+[data-pad="true"].bg-gray-50,
+.bg-gray-50[style*="paddingTop: '4px'"] {
+  background-color: #f5f3ed !important;
+}
+
+.bg-gray-100 {
+  background-color: #faf8f2 !important;
+}
+
+.bg-white, [style*="background-color: rgb(255, 255, 255)"] {
+  background-color: #ffffff !important;
+}
+
+/* Border colors */
+.border-gray-200, .border-gray-300 {
+  border-color: #e5e0d5 !important;
+}
+
+/* Card/panel backgrounds */
+.shadow, .shadow-sm, .shadow-lg, .shadow-md {
+  --tw-shadow-color: rgba(0, 0, 0, 0.05);
+}
+
+@keyframes scroll-marquee {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(calc(-1 * var(--scroll-distance, 50px)));
+  }
+}
