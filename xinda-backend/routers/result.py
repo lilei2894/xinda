@@ -359,9 +359,6 @@ def run_continue_processing(
         ocr_complete_pages = {p for p, c in ocr_dict.items() if c.strip() and not c.strip().startswith('Error:')}
         trans_complete_pages = {p for p, c in trans_dict.items() if c.strip() and not c.strip().startswith('Error:')}
         
-        current_ocr_service = OCRService(endpoint=ocr_endpoint, model=ocr_model, language=doc_lang, api_key=ocr_api_key)
-        current_trans_service = TranslateService(endpoint=ocr_endpoint, model=trans_model, api_key=trans_api_key)
-        
         if len(ocr_complete_pages) < total_pages:
             try:
                 resolved_path = resolve_file_path(record.file_path)
@@ -374,6 +371,29 @@ def run_continue_processing(
                     page_num = idx + 1
                     if page_num in ocr_complete_pages:
                         continue
+                    
+                    # 每次处理前重新读取最新的模型设置
+                    db.refresh(record)
+                    current_ocr_model_full = record.ocr_model_id
+                    current_ocr_model = ocr_model
+                    current_ocr_api_key = ocr_api_key
+                    current_ocr_endpoint = ocr_endpoint
+                    
+                    if current_ocr_model_full and '/' in current_ocr_model_full:
+                        parts = current_ocr_model_full.split('/')
+                        provider_id = int(parts[0])
+                        provider = db.query(Provider).filter(Provider.id == provider_id).first()
+                        if provider:
+                            current_ocr_model = parts[1]
+                            current_ocr_api_key = provider.api_key
+                            current_ocr_endpoint = provider.base_url
+                    
+                    current_ocr_service = OCRService(
+                        endpoint=current_ocr_endpoint, 
+                        model=current_ocr_model, 
+                        language=doc_lang, 
+                        api_key=current_ocr_api_key
+                    )
                     
                     try:
                         if record.file_type == "pdf":
@@ -407,6 +427,28 @@ def run_continue_processing(
             for page_num in sorted(ocr_complete_pages):
                 if page_num in trans_complete_pages:
                     continue
+                
+                # 每次翻译前重新读取最新的模型设置
+                db.refresh(record)
+                current_trans_model_full = record.translate_model_id
+                current_trans_model = trans_model
+                current_trans_api_key = trans_api_key
+                current_trans_endpoint = ocr_endpoint
+                
+                if current_trans_model_full and '/' in current_trans_model_full:
+                    parts = current_trans_model_full.split('/')
+                    provider_id = int(parts[0])
+                    provider = db.query(Provider).filter(Provider.id == provider_id).first()
+                    if provider:
+                        current_trans_model = parts[1]
+                        current_trans_api_key = provider.api_key
+                        current_trans_endpoint = provider.base_url
+                
+                current_trans_service = TranslateService(
+                    endpoint=current_trans_endpoint, 
+                    model=current_trans_model, 
+                    api_key=current_trans_api_key
+                )
                 
                 try:
                     translated = current_trans_service.translate_to_chinese(ocr_dict[page_num])

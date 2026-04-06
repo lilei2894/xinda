@@ -100,6 +100,9 @@ export default function Home() {
         <ModelSettingsModal
           isOpen={showModelModal}
           onClose={() => setShowModelModal(false)}
+          onModelsChange={() => {
+            window.dispatchEvent(new Event('refresh-home-data'));
+          }}
         />
 
         <PromptSettingsModal
