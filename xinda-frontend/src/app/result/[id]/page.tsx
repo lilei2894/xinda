@@ -701,7 +701,6 @@ export default function ResultPage() {
                     className={`text-sm px-3 py-2 rounded cursor-pointer ${
                       block.pageNum === currentPage ? 'text-gray-900 bg-gray-50 border border-gray-200' : 'text-gray-900 bg-transparent border border-transparent hover:border-gray-200 hover:bg-gray-50'
                     }`}
-                    title={`点击跳转P${block.pageNum}，右击选择`}
                   >
                     <span className="inline-block px-1.5 py-0.5 mr-1 text-xs font-semibold rounded bg-blue-100 text-blue-800">P{block.pageNum}</span> <span className="whitespace-pre-line">{block.content}</span>
                   </div>
@@ -814,7 +813,6 @@ export default function ResultPage() {
                     className={`text-sm px-3 py-2 rounded cursor-pointer ${
                       block.pageNum === currentPage ? 'text-gray-900 bg-gray-50 border border-gray-200' : 'text-gray-900 bg-transparent border border-transparent hover:border-gray-200 hover:bg-gray-50'
                     }`}
-                    title={`点击跳转P${block.pageNum}，右击选择`}
                   >
                     <span className="inline-block px-1.5 py-0.5 mr-1 text-xs font-semibold rounded bg-green-100 text-green-800">P{block.pageNum}</span> <span className="whitespace-pre-line">{block.content}</span>
                   </div>

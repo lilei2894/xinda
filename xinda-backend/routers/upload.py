@@ -88,6 +88,28 @@ def process_file_background(record_id: str, file_path: str, file_type: str, ocr_
                                 local_record.ocr_last_page = str(page_num - 1)
                                 local_db.commit()
                                 break
+                            
+                            # 重新读取最新的模型设置
+                            current_ocr_model_full = local_record.ocr_model_id if local_record else None
+                            current_ocr_model = ocr_model
+                            current_ocr_api_key = ocr_api_key
+                            current_endpoint = endpoint
+                            
+                            if current_ocr_model_full and '/' in current_ocr_model_full:
+                                parts = current_ocr_model_full.split('/')
+                                provider_id = int(parts[0])
+                                provider = local_db.query(Provider).filter(Provider.id == provider_id).first()
+                                if provider:
+                                    current_ocr_model = parts[1]
+                                    current_ocr_api_key = provider.api_key
+                                    current_endpoint = provider.base_url
+                            
+                            current_ocr_service = OCRService(
+                                model=current_ocr_model, 
+                                endpoint=current_endpoint, 
+                                language=language, 
+                                api_key=current_ocr_api_key
+                            )
                         finally:
                             local_db.close()
                         
@@ -95,8 +117,8 @@ def process_file_background(record_id: str, file_path: str, file_type: str, ocr_
                             page_obj = doc[page_num - 1]
                             pix = page_obj.get_pixmap()
                             img = Image.open(BytesIO(pix.tobytes("png")))
-                            img_base64 = ocr_service.image_to_base64(img)
-                            text = ocr_service.call_vision_model(img_base64)
+                            img_base64 = current_ocr_service.image_to_base64(img)
+                            text = current_ocr_service.call_vision_model(img_base64)
                             with lock:
                                 ocr_done[page_num] = text
                         except Exception as e:
@@ -148,12 +170,34 @@ def process_file_background(record_id: str, file_path: str, file_type: str, ocr_
                         local_record = local_db.query(ProcessingHistory).filter(ProcessingHistory.id == record_id).first()
                         if local_record and local_record.trans_paused == "true":
                             break
+                        
+                        # 重新读取最新的模型设置
+                        current_trans_model_full = local_record.translate_model_id if local_record else None
+                        current_trans_model = translate_model
+                        current_trans_api_key = translate_api_key
+                        current_endpoint = endpoint
+                        
+                        if current_trans_model_full and '/' in current_trans_model_full:
+                            parts = current_trans_model_full.split('/')
+                            provider_id = int(parts[0])
+                            provider = local_db.query(Provider).filter(Provider.id == provider_id).first()
+                            if provider:
+                                current_trans_model = parts[1]
+                                current_trans_api_key = provider.api_key
+                                current_endpoint = provider.base_url
+                        
+                        current_trans_service = TranslateService(
+                            model=current_trans_model, 
+                            endpoint=current_endpoint, 
+                            language=language, 
+                            api_key=current_trans_api_key
+                        )
                     finally:
                         local_db.close()
                     
                     if page_content.strip() and not page_content.strip().startswith('Error:'):
                         try:
-                            translated = translate_service.translate_to_chinese(page_content)
+                            translated = current_trans_service.translate_to_chinese(page_content)
                         except Exception as e:
                             translated = f"Error: {str(e)}"
                     else:

@@ -65,7 +65,7 @@ export default function PDFViewer({ fileUrl, currentPage, onPageChange, scale = 
     const handleWheelNative = (e: WheelEvent) => {
       e.preventDefault();
       e.stopPropagation();
-      const delta = e.deltaY > 0 ? 0.1 : -0.1;
+      const delta = e.deltaY > 0 ? -0.1 : 0.1;
       const newScale = Math.max(0.3, Math.min(5.0, effectiveScale + delta));
       window.dispatchEvent(new CustomEvent('pdf-scale-change', { detail: { scale: newScale } }));
     };
