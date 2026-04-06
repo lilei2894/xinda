@@ -1,0 +1,367 @@
+from fastapi import APIRouter, UploadFile, File, HTTPException
+from sqlalchemy.orm import Session
+from fastapi import Depends
+from typing import Optional
+import os
+import uuid
+import threading
+import time
+from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor
+from models.database import get_db, ProcessingHistory, Provider
+from services.ocr_service import OCRService
+from services.translate_service import TranslateService
+
+router = APIRouter()
+
+UPLOAD_DIR = os.getenv("UPLOAD_DIR", "./uploads")
+MAX_FILE_SIZE = int(os.getenv("MAX_FILE_SIZE", "20971520"))
+
+upload_executor = ThreadPoolExecutor(max_workers=2)
+
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+ALLOWED_TYPES = ["application/pdf", "image/jpeg", "image/jpg"]
+
+
+def process_file_background(record_id: str, file_path: str, file_type: str, ocr_model: str, translate_model: str, endpoint: str, language: str = "ja", ocr_api_key: str = None, translate_api_key: str = None):
+    import fitz
+    from PIL import Image
+    from io import BytesIO
+    from models.database import SessionLocal
+    
+    db = SessionLocal()
+    try:
+        record = db.query(ProcessingHistory).filter(ProcessingHistory.id == record_id).first()
+        if not record:
+            return
+        
+        record.status = "processing"
+        
+        if language == "auto":
+            try:
+                ocr_service_temp = OCRService(model=ocr_model, endpoint=endpoint, api_key=ocr_api_key)
+                if file_type == "pdf":
+                    doc = fitz.open(file_path)
+                    page_obj = doc[0]
+                    pix = page_obj.get_pixmap()
+                    img = Image.open(BytesIO(pix.tobytes("png")))
+                    doc.close()
+                else:
+                    img = Image.open(file_path)
+                img_base64 = ocr_service_temp.image_to_base64(img)
+                detected = ocr_service_temp.detect_language(img_base64)
+                language = detected
+                record.model_endpoint = detected
+                db.commit()
+            except Exception:
+                language = "ja"
+        
+        db.commit()
+        
+        ocr_service = OCRService(model=ocr_model, endpoint=endpoint, language=language, api_key=ocr_api_key)
+        translate_service = TranslateService(model=translate_model, endpoint=endpoint, language=language, api_key=translate_api_key)
+        
+        if file_type == "pdf":
+            pdf_doc = fitz.open(file_path)
+            record.total_pages = str(pdf_doc.page_count)
+            total_pages = pdf_doc.page_count
+            pdf_doc.close()
+        else:
+            total_pages = 1
+        
+        ocr_done = {}
+        trans_done = {}
+        lock = threading.Lock()
+        
+        def ocr_worker():
+            try:
+                if file_type == "pdf":
+                    doc = fitz.open(file_path)
+                    for idx in range(doc.page_count):
+                        page_num = idx + 1
+                        
+                        local_db = SessionLocal()
+                        try:
+                            local_record = local_db.query(ProcessingHistory).filter(ProcessingHistory.id == record_id).first()
+                            if local_record and local_record.ocr_paused == "true":
+                                local_record.ocr_last_page = str(page_num - 1)
+                                local_db.commit()
+                                break
+                        finally:
+                            local_db.close()
+                        
+                        try:
+                            page_obj = doc[page_num - 1]
+                            pix = page_obj.get_pixmap()
+                            img = Image.open(BytesIO(pix.tobytes("png")))
+                            img_base64 = ocr_service.image_to_base64(img)
+                            text = ocr_service.call_vision_model(img_base64)
+                            with lock:
+                                ocr_done[page_num] = text
+                        except Exception as e:
+                            with lock:
+                                ocr_done[page_num] = f"Error: {str(e)}"
+                    doc.close()
+                else:
+                    img = Image.open(file_path)
+                    img_base64 = ocr_service.image_to_base64(img)
+                    text = ocr_service.call_vision_model(img_base64)
+                    with lock:
+                        ocr_done[1] = text
+            except Exception as e:
+                for idx in range(1, total_pages + 1):
+                    with lock:
+                        if idx not in ocr_done:
+                            ocr_done[idx] = f"Error: {str(e)}"
+        
+        def translate_worker():
+            while True:
+                local_db = SessionLocal()
+                try:
+                    local_record = local_db.query(ProcessingHistory).filter(ProcessingHistory.id == record_id).first()
+                    trans_paused = local_record and local_record.trans_paused == "true"
+                finally:
+                    local_db.close()
+                
+                if trans_paused:
+                    time.sleep(1)
+                    continue
+                
+                with lock:
+                    pages_to_translate = [p for p in range(1, total_pages + 1) if p in ocr_done and p not in trans_done]
+                    ocr_complete = len(ocr_done) >= total_pages
+                
+                if not pages_to_translate and ocr_complete:
+                    break
+                
+                if not pages_to_translate:
+                    time.sleep(1)
+                    continue
+                
+                for page_num in pages_to_translate:
+                    with lock:
+                        page_content = ocr_done.get(page_num, '')
+                    
+                    local_db = SessionLocal()
+                    try:
+                        local_record = local_db.query(ProcessingHistory).filter(ProcessingHistory.id == record_id).first()
+                        if local_record and local_record.trans_paused == "true":
+                            break
+                    finally:
+                        local_db.close()
+                    
+                    if page_content.strip() and not page_content.strip().startswith('Error:'):
+                        try:
+                            translated = translate_service.translate_to_chinese(page_content)
+                        except Exception as e:
+                            translated = f"Error: {str(e)}"
+                    else:
+                        translated = page_content
+                    
+                    with lock:
+                        trans_done[page_num] = translated
+                    
+                    if page_num % 3 == 0 or page_num == total_pages:
+                        with lock:
+                            new_trans_full = []
+                            for p in range(1, total_pages + 1):
+                                content = trans_done.get(p, '')
+                                new_trans_full.append(f"=== Page {p} ===\n{content}")
+                            record.translated_text = "\n\n".join(new_trans_full)
+                        db.commit()
+                
+                time.sleep(1)
+        
+        ocr_thread = threading.Thread(target=ocr_worker)
+        trans_thread = threading.Thread(target=translate_worker)
+        
+        ocr_thread.start()
+        trans_thread.start()
+        
+        while ocr_thread.is_alive():
+            time.sleep(2)  # Reduce commit frequency
+            # Only update periodically, not every 0.5s
+            with lock:
+                new_ocr_full = []
+                for p in range(1, total_pages + 1):
+                    content = ocr_done.get(p, '')
+                    new_ocr_full.append(f"=== Page {p} ===\n{content}")
+                record.ocr_text = "\n\n".join(new_ocr_full)
+            db.commit()
+        
+        ocr_thread.join()
+        trans_thread.join()
+        
+        with lock:
+            new_ocr_full = []
+            for p in range(1, total_pages + 1):
+                content = ocr_done.get(p, '')
+                new_ocr_full.append(f"=== Page {p} ===\n{content}")
+            record.ocr_text = "\n\n".join(new_ocr_full)
+            db.commit()
+        
+        with lock:
+            new_trans_full = []
+            for p in range(1, total_pages + 1):
+                content = trans_done.get(p, '')
+                new_trans_full.append(f"=== Page {p} ===\n{content}")
+            full_translated_text = "\n\n".join(new_trans_full)
+            record.translated_text = full_translated_text
+            db.commit()
+        
+        try:
+            title = translate_service.generate_title(full_translated_text)
+            if title:
+                record.content_title = title
+                db.commit()
+        except Exception:
+            pass
+        
+        # Check if all pages are complete before marking as completed
+        ocr_pages_count = len([p for p in range(1, total_pages + 1) if ocr_done.get(p, '').strip() and not ocr_done.get(p, '').strip().startswith('Error:')])
+        trans_pages_count = len([p for p in range(1, total_pages + 1) if trans_done.get(p, '').strip() and not trans_done.get(p, '').strip().startswith('Error:')])
+        
+        if ocr_pages_count >= total_pages and trans_pages_count >= total_pages:
+            record.status = "completed"
+        else:
+            record.status = "processing"
+        db.commit()
+    except Exception:
+        record = db.query(ProcessingHistory).filter(ProcessingHistory.id == record_id).first()
+        if record:
+            record.status = "failed"
+            db.commit()
+    finally:
+        db.close()
+
+
+@router.post("", response_model=dict)
+@router.post("/", response_model=dict)
+async def upload_file(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
+    if file.content_type not in ALLOWED_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail="Only PDF and JPG files are allowed"
+        )
+    
+    file.file.seek(0, 2)
+    file_size = file.file.tell()
+    file.file.seek(0)
+    
+    if file_size > MAX_FILE_SIZE:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File size exceeds {MAX_FILE_SIZE} bytes limit"
+        )
+    
+    file_id = str(uuid.uuid4())
+    file_extension = os.path.splitext(file.filename)[1]
+    saved_filename = f"{file_id}{file_extension}"
+    file_path = os.path.join(UPLOAD_DIR, saved_filename)
+    
+    with open(file_path, "wb") as buffer:
+        content = await file.read()
+        buffer.write(content)
+    
+    file_type = "pdf" if file.content_type == "application/pdf" else "jpg"
+    
+    record = ProcessingHistory(
+        id=file_id,
+        original_filename=file.filename,
+        file_type=file_type,
+        file_path=file_path,
+        total_pages=None,
+        status="pending"
+    )
+    
+    if record.file_type == "pdf":
+        import fitz
+        pdf_doc = fitz.open(file_path)
+        record.total_pages = str(pdf_doc.page_count)
+        pdf_doc.close()
+    
+    db.add(record)
+    db.commit()
+    db.refresh(record)
+    
+    return {
+        "id": record.id,
+        "original_filename": record.original_filename,
+        "file_type": record.file_type,
+        "total_pages": record.total_pages,
+        "status": record.status,
+        "upload_time": record.upload_time.isoformat()
+    }
+
+
+@router.post("/{file_id}/process", response_model=dict)
+async def process_file(
+    file_id: str,
+    ocr_model: str = None,
+    translate_model: str = None,
+    endpoint: str = None,
+    language: str = "auto",
+    db: Session = Depends(get_db),
+):
+    record = db.query(ProcessingHistory).filter(ProcessingHistory.id == file_id).first()
+    if not record:
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    if record.status != "pending":
+        raise HTTPException(status_code=400, detail=f"File cannot be processed (status: {record.status})")
+    
+    if not ocr_model or not translate_model or not endpoint:
+        raise HTTPException(status_code=400, detail="Missing model configuration")
+    
+    def parse_model_id(model_id: str):
+        if model_id and '/' in model_id:
+            parts = model_id.split('/')
+            return int(parts[0]), parts[1]
+        return None, model_id
+    
+    ocr_provider_id, ocr_model_name = parse_model_id(ocr_model)
+    translate_provider_id, translate_model_name = parse_model_id(translate_model)
+    
+    ocr_api_key = None
+    translate_api_key = None
+    
+    if ocr_provider_id:
+        ocr_provider = db.query(Provider).filter(Provider.id == ocr_provider_id).first()
+        if ocr_provider:
+            ocr_api_key = ocr_provider.api_key
+    
+    if translate_provider_id:
+        translate_provider = db.query(Provider).filter(Provider.id == translate_provider_id).first()
+        if translate_provider:
+            translate_api_key = translate_provider.api_key
+    
+    record.ocr_model_id = ocr_model
+    record.translate_model_id = translate_model
+    record.doc_language = language
+    db.commit()
+    
+    upload_executor.submit(
+        process_file_background,
+        file_id,
+        record.file_path,
+        record.file_type,
+        ocr_model_name,
+        translate_model_name,
+        endpoint,
+        language,
+        ocr_api_key,
+        translate_api_key,
+    )
+    
+    record.status = "processing"
+    db.commit()
+    
+    return {
+        "id": record.id,
+        "status": record.status,
+        "message": "Processing started"
+    }

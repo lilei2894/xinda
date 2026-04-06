@@ -1,0 +1,28 @@
+{
+  "active_plan": "/Users/lilei/Projects/xinda/.sisyphus/plans/homepage-layout-redesign.md",
+  "started_at": "2026-04-03T13:16:59.660Z",
+  "session_ids": [
+    "ses_2acab422cffe9e316Obc30uHni",
+    "ses_2ac7ed1e8ffeY2LyNaQufUJGwu",
+    "ses_2ac67589fffetYMeajMbJGZw43",
+    "ses_2ac315399ffegB9FeoVGu35M5v",
+    "ses_2a97a831fffeGOgnSKTrQjnVIS",
+    "ses_2a9711709ffe7wAj2s599KdLCr",
+    "ses_2a873ba10ffehCuvV0901WmJEB",
+    "ses_2a873bf95ffeTaoPLvJVOpdEGh",
+    "ses_2a84f1819ffe5qnmz0b25jCcu9"
+  ],
+  "plan_name": "homepage-layout-redesign",
+  "agent": "atlas",
+  "task_sessions": {
+    "todo:1": {
+      "task_key": "todo:1",
+      "task_label": "1",
+      "task_title": "Backend: Provider/Model Database Models + API",
+      "session_id": "ses_2ac7ed1e8ffeY2LyNaQufUJGwu",
+      "agent": "Sisyphus-Junior",
+      "category": "unspecified-high",
+      "updated_at": "2026-04-03T13:26:07.570Z"
+    }
+  }
+}
