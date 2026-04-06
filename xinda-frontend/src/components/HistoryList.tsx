@@ -114,16 +114,13 @@ export default function HistoryList() {
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-48">
+                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-48">
                       文件名
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-48">
+                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider" style={{ width: '20em' }}>
                       文件内容
                     </th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-20">
-                      类型
-                    </th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-20">
+                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-12">
                       页数
                     </th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-36">
@@ -147,20 +144,17 @@ export default function HistoryList() {
                         onClick={() => handleRowClick(record.id, record.status)}
                         className={`${isClickable ? 'cursor-pointer hover:bg-gray-50' : ''}`}
                       >
-                        <td className="px-4 py-3 text-sm text-gray-900">
+                        <td className="px-4 py-3 text-sm text-gray-900 text-left">
                           <span className="block max-w-[180px] truncate" title={record.original_filename}>
                             {record.original_filename}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-500">
-                          <span className="block max-w-[180px] truncate" title={record.content_title || ''}>
+                        <td className="px-4 py-3 text-sm text-gray-500 text-left" style={{ maxWidth: '20em' }}>
+                          <span className="block truncate" title={record.content_title || ''}>
                             {record.content_title || '-'}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-500 text-center">
-                          {record.file_type?.toUpperCase()}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-500 text-center">
+                        <td className="px-4 py-3 text-sm text-gray-500 text-right">
                           {record.total_pages || '-'}
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-500 text-center">
