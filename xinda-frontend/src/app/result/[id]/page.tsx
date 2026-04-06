@@ -382,8 +382,13 @@ export default function ResultPage() {
   const ocrProgress = totalPages > 0 ? Math.round((completedOcrPages / totalPages) * 100) : 0;
   const transProgress = totalPages > 0 ? Math.round((completedTransPages / totalPages) * 100) : 0;
 
-  const isAllComplete = completedOcrPages >= totalPages && completedTransPages >= totalPages && totalPages > 0;
+  const isOcrComplete = completedOcrPages >= totalPages && totalPages > 0;
+  const isTransComplete = completedTransPages >= totalPages && totalPages > 0;
+  const isAllComplete = isOcrComplete && isTransComplete;
   const isProcessing = result?.status === 'processing' || result?.status === 'uploaded' || (!isAllComplete && result?.status === 'completed');
+  
+  const isOcrProcessing = !isOcrComplete && isProcessing;
+  const isTransProcessing = !isTransComplete && isProcessing;
 
   const getOcrContentForPage = (pageNum: number) => {
     return ocrBlocks.find(b => b.pageNum === pageNum)?.content || '';
@@ -607,7 +612,7 @@ export default function ResultPage() {
             <h2 className="text-sm font-semibold text-gray-900">外文识别</h2>
             <div className="flex-1" />
             <CustomDropdown
-              className={isProcessing ? 'w-1/3' : 'w-1/2'}
+              className={isOcrProcessing ? 'w-1/3' : 'w-1/2'}
               size="sm"
               value={selectedOcrModel}
               onChange={async (val) => {
@@ -623,9 +628,9 @@ export default function ResultPage() {
                 label: m.displayName
               }))}
             />
-            {!isProcessing && <div className="flex-1" />}
+            {!isOcrProcessing && <div className="flex-1" />}
             <div className="flex items-center gap-2">
-              {isProcessing ? (
+              {isOcrProcessing ? (
                 isOcrPaused ? (
                   <button
                     onClick={async () => {
@@ -708,7 +713,7 @@ export default function ResultPage() {
               </div>
             ) : (
               <div className="text-center py-8 text-gray-400 text-sm">
-                {isProcessing ? '正在识别...' : '尚未识别'}
+                {isOcrProcessing ? '正在识别...' : '尚未识别'}
               </div>
             )}
           </div>
@@ -719,7 +724,7 @@ export default function ResultPage() {
             <h2 className="text-sm font-semibold text-gray-900">中文翻译</h2>
             <div className="flex-1" />
             <CustomDropdown
-              className={isProcessing ? 'w-1/3' : 'w-1/2'}
+              className={isTransProcessing ? 'w-1/3' : 'w-1/2'}
               size="sm"
               value={selectedTransModel}
               onChange={async (val) => {
@@ -735,9 +740,9 @@ export default function ResultPage() {
                 label: m.displayName
               }))}
             />
-            {!isProcessing && <div className="flex-1" />}
+            {!isTransProcessing && <div className="flex-1" />}
             <div className="flex items-center gap-2">
-              {isProcessing ? (
+              {isTransProcessing ? (
                 isTransPaused ? (
                   <button
                     onClick={async () => {
@@ -820,7 +825,7 @@ export default function ResultPage() {
               </div>
             ) : (
               <div className="text-center py-8 text-gray-400 text-sm">
-                {isProcessing ? '正在处理...' : '尚未翻译'}
+                {isTransProcessing ? '正在处理...' : '尚未翻译'}
               </div>
             )}
           </div>
