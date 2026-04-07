@@ -25,7 +25,7 @@
 - ✅ 可自定义提示词模板
 - ✅ 暂停/继续功能（OCR、翻译可独立控制）
 - ✅ 重新识别/翻译当前页
-- ✅ 捐赠支持
+
 
 ## 技术栈
 
@@ -82,7 +82,6 @@ xinda/
 
 - Node.js 18+
 - Python 3.9+
-- Ollama 服务器（或使用其他 AI API）
 
 ### 1. 安装前端依赖
 
@@ -100,107 +99,34 @@ source venv/bin/activate  # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-### 3. 配置环境变量
-
-#### 后端配置 (.env)
-
-```env
-# AI 模型端点配置
-OLLAMA_ENDPOINT=http://localhost:11434
-OPENAI_API_KEY=your-api-key
-OPENAI_BASE_URL=https://api.openai.com/v1
-
-# 数据库配置
-DATABASE_URL=sqlite:///./data/xinda.db
-
-# 上传配置
-UPLOAD_DIR=./uploads
-MAX_FILE_SIZE=20971520
-```
-
-#### 前端配置 (.env.local)
-
-```env
-NEXT_PUBLIC_API_URL=http://localhost:8000/api
-```
-
-## 运行方式
-
-### 快速启动
+### 3. 启动服务
 
 ```bash
-# 使用项目提供的启动脚本（同时启动前后端）
+# 使用启动脚本（同时启动前后端）
 ./start.sh
 ```
 
-### 手动启动
-
-#### 启动后端服务
+或手动启动：
 
 ```bash
+# 后端
 cd xinda-backend
 source venv/bin/activate
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
-```
 
-后端将在 http://localhost:8000 运行，API 文档：http://localhost:8000/docs
-
-#### 启动前端服务
-
-```bash
+# 前端（新终端）
 cd xinda-frontend
 npm run dev
 ```
 
-前端将在 http://localhost:3000 运行
+前端：http://localhost:3000
+后端 API 文档：http://localhost:8000/docs
 
-## 使用指南
+### 4. 配置模型
 
-### 1. 配置模型供应商
+首次使用需要在「模型设置」中添加 AI 模型供应商。支持 Ollama、OpenAI、阿里云、DeepSeek、Google 等。
 
-首次使用前，需要在「模型设置」中添加 AI 模型供应商：
-- 输入供应商名称、API 地址、API Key
-- 添加可用模型列表
-- 测试连接确保配置正确
-
-### 2. 上传文件
-
-- 打开浏览器访问 http://localhost:3000
-- 拖拽或点击上传 PDF 或 JPG 文件
-
-### 3. 选择模型与设置
-
-- **识别模型**：选择用于 OCR 识别的视觉模型
-- **翻译模型**：选择用于翻译的文本模型
-- **语种选择**：建议选择具体语种（如「日文」）以获得更好效果，「自动检测」可能需要更长的检测时间
-
-### 4. 配置提示词（重要！）
-
-点击「提示词设置」进入配置页面，针对每种语言设置专属提示词：
-- **OCR 识别提示词**：告诉模型如何识别文档中的文字
-- **翻译提示词**：告诉模型如何翻译特定语言到中文
-- **语言检测提示词**：用于自动检测文档语种
-
-提示词配置直接影响最终识别和翻译质量，请根据实际效果调整。
-
-### 5. 查看处理结果
-
-- 文件上传后自动跳转到结果页面
-- 左侧显示原始图像
-- 中间显示识别出的外文文本
-- 右侧显示中文翻译
-
-### 6. 暂停/继续
-
-- 处理过程中可暂停 OCR 或翻译任务
-- 暂停不影响其他任务继续进行
-- 暂停后更换模型，继续时使用新模型
-
-### 7. 导出结果
-
-- 在结果页面点击「导出」按钮
-- 可选择导出识别稿（外文原文）或翻译稿（中文）
-- 导出会生成 Word 文档
+详细使用说明请查看 [使用指南](xinda-frontend/public/usage.md)。
 
 ## API 文档
 
