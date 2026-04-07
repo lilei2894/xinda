@@ -117,7 +117,7 @@ export default function Home() {
       <div className="mt-16 text-center text-sm text-gray-400">
         信达 XINDA © 2026 Pedro ·{' '}
         <a
-          href="https://github.com/lilei2894/信达"
+          href="https://github.com/lilei2894/xinda"
           target="_blank"
           rel="noopener noreferrer"
           className="text-blue-600 hover:text-blue-800 underline"
