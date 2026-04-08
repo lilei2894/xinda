@@ -235,6 +235,39 @@ echo "🌐 前端地址: http://localhost:3000"
 echo "🔧 后端地址: http://localhost:8000"
 echo "📚 API文档:  http://localhost:8000/docs"
 echo ""
+
+# 自动打开浏览器
+open_browser() {
+    local url="http://localhost:3000"
+    echo "🚀 正在打开浏览器..."
+    sleep 3  # 等待服务启动
+    
+    case "$OS" in
+        macos)
+            open "$url" 2>/dev/null && echo "✅ 浏览器已打开" || echo "⚠️  请手动打开: $url"
+            ;;
+        linux)
+            if command -v xdg-open &> /dev/null; then
+                xdg-open "$url" 2>/dev/null && echo "✅ 浏览器已打开" || echo "⚠️  请手动打开: $url"
+            elif command -v gnome-open &> /dev/null; then
+                gnome-open "$url" 2>/dev/null && echo "✅ 浏览器已打开" || echo "⚠️  请手动打开: $url"
+            else
+                echo "⚠️  请手动打开浏览器访问: $url"
+            fi
+            ;;
+        windows)
+            start "$url" 2>/dev/null && echo "✅ 浏览器已打开" || echo "⚠️  请手动打开: $url"
+            ;;
+        *)
+            echo "⚠️  请手动打开浏览器访问: $url"
+            ;;
+    esac
+}
+
+# 启动后打开浏览器
+open_browser
+
+echo ""
 echo "按 Ctrl+C 停止所有服务"
 echo ""
 
