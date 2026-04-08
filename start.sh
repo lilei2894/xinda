@@ -31,7 +31,7 @@ kill_port() {
     fi
 }
 
-# 检查并安装 Python
+# 检查并安装 Python 3.13
 install_python() {
     local os=$1
     
@@ -40,30 +40,60 @@ install_python() {
         return 0
     fi
     
-    echo "❌ Python 未安装，正在尝试安装..."
+    echo "❌ Python 未安装，正在尝试安装 Python 3.13..."
     
     if [ "$os" = "macos" ]; then
-        # 检查 Homebrew
+        # macOS - 使用 Homebrew
         if command -v brew &> /dev/null; then
-            echo "   使用 Homebrew 安装 Python..."
-            brew install python
+            echo "   使用 Homebrew 安装 Python 3.13..."
+            brew install python@3.13 || brew install python
             echo "✅ Python 安装完成"
+            echo "   请关闭此终端并重新运行脚本以刷新 PATH"
             return 0
         else
             echo "❌ Homebrew 未安装，请先安装 Homebrew: https://brew.sh"
             return 1
         fi
+    elif [ "$os" = "linux" ]; then
+        # Linux - 尝试多个包管理器
+        if command -v apt-get &> /dev/null; then
+            echo "   使用 apt 安装 Python 3.13..."
+            sudo apt-get update
+            sudo apt-get install -y python3.13 python3.13-venv python3-pip || \
+            sudo apt-get install -y python3 python3-venv python3-pip
+            echo "✅ Python 安装完成"
+            echo "   请关闭此终端并重新运行脚本以刷新 PATH"
+            return 0
+        elif command -v yum &> /dev/null; then
+            echo "   使用 yum 安装 Python 3..."
+            sudo yum install -y python3 python3-pip || \
+            sudo dnf install -y python3 python3-pip
+            echo "✅ Python 安装完成"
+            echo "   请关闭此终端并重新运行脚本以刷新 PATH"
+            return 0
+        elif command -v pacman &> /dev/null; then
+            echo "   使用 pacman 安装 Python..."
+            sudo pacman -S --noconfirm python python-pip
+            echo "✅ Python 安装完成"
+            echo "   请关闭此终端并重新运行脚本以刷新 PATH"
+            return 0
+        else
+            echo "❌ 无法自动安装 Python，请手动安装: https://www.python.org/downloads/"
+            return 1
+        fi
     elif [ "$os" = "windows" ]; then
         # Windows - 尝试使用 winget 或 choco
         if command -v winget &> /dev/null; then
-            echo "   使用 winget 安装 Python..."
-            winget install Python.Python.3.11 --accept-source-agreements --accept-package-agreements
+            echo "   使用 winget 安装 Python 3.13..."
+            winget install Python.Python.3.13 --accept-source-agreements --accept-package-agreements
             echo "✅ Python 安装完成"
+            echo "   请关闭此窗口并重新运行脚本以刷新 PATH"
             return 0
         elif command -v choco &> /dev/null; then
-            echo "   使用 Chocolatey 安装 Python..."
-            choco install python --yes
+            echo "   使用 Chocolatey 安装 Python 3.13..."
+            choco install python313 --yes || choco install python --yes
             echo "✅ Python 安装完成"
+            echo "   请关闭此窗口并重新运行脚本以刷新 PATH"
             return 0
         else
             echo "❌ 请手动安装 Python: https://www.python.org/downloads/"
@@ -75,7 +105,7 @@ install_python() {
     fi
 }
 
-# 检查并安装 Node.js
+# 检查并安装 Node.js 22
 install_nodejs() {
     local os=$1
     
@@ -84,28 +114,61 @@ install_nodejs() {
         return 0
     fi
     
-    echo "❌ Node.js 未安装，正在尝试安装..."
+    echo "❌ Node.js 未安装，正在尝试安装 Node.js 22..."
     
     if [ "$os" = "macos" ]; then
+        # macOS - 使用 Homebrew
         if command -v brew &> /dev/null; then
-            echo "   使用 Homebrew 安装 Node.js..."
-            brew install node
+            echo "   使用 Homebrew 安装 Node.js 22..."
+            brew install node@22 || brew install node
             echo "✅ Node.js 安装完成"
+            echo "   请关闭此终端并重新运行脚本以刷新 PATH"
             return 0
         else
             echo "❌ Homebrew 未安装，请先安装 Homebrew: https://brew.sh"
             return 1
         fi
+    elif [ "$os" = "linux" ]; then
+        # Linux - 尝试多个包管理器
+        if command -v apt-get &> /dev/null; then
+            echo "   使用 apt 安装 Node.js 22..."
+            curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - || \
+            curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -
+            sudo apt-get install -y nodejs
+            echo "✅ Node.js 安装完成"
+            echo "   请关闭此终端并重新运行脚本以刷新 PATH"
+            return 0
+        elif command -v yum &> /dev/null; then
+            echo "   使用 yum 安装 Node.js..."
+            curl -fsSL https://rpm.nodesource.com/setup_22.x | sudo bash - || \
+            curl -fsSL https://rpm.nodesource.com/setup_lts.x | sudo bash -
+            sudo yum install -y nodejs || sudo dnf install -y nodejs
+            echo "✅ Node.js 安装完成"
+            echo "   请关闭此终端并重新运行脚本以刷新 PATH"
+            return 0
+        elif command -v pacman &> /dev/null; then
+            echo "   使用 pacman 安装 Node.js..."
+            sudo pacman -S --noconfirm nodejs npm
+            echo "✅ Node.js 安装完成"
+            echo "   请关闭此终端并重新运行脚本以刷新 PATH"
+            return 0
+        else
+            echo "❌ 无法自动安装 Node.js，请手动安装: https://nodejs.org/"
+            return 1
+        fi
     elif [ "$os" = "windows" ]; then
+        # Windows - 尝试使用 winget 或 choco
         if command -v winget &> /dev/null; then
-            echo "   使用 winget 安装 Node.js..."
+            echo "   使用 winget 安装 Node.js 22..."
             winget install OpenJS.NodeJS.LTS --accept-source-agreements --accept-package-agreements
             echo "✅ Node.js 安装完成"
+            echo "   请关闭此窗口并重新运行脚本以刷新 PATH"
             return 0
         elif command -v choco &> /dev/null; then
-            echo "   使用 Chocolatey 安装 Node.js..."
+            echo "   使用 Chocolatey 安装 Node.js 22..."
             choco install nodejs-lts --yes
             echo "✅ Node.js 安装完成"
+            echo "   请关闭此窗口并重新运行脚本以刷新 PATH"
             return 0
         else
             echo "❌ 请手动安装 Node.js: https://nodejs.org/"

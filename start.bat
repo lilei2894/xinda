@@ -1,134 +1,165 @@
 @echo off
-chcp 65001 >nul
-setlocal enabledelayedexpansion
+setlocal
 
 echo ====================================
-echo   外文档案文献处理工作台 - 启动脚本
-echo   (Windows 版本)
+echo   Xinda Project Launcher
 echo ====================================
 echo.
 
-REM 设置项目根目录
 set "PROJECT_DIR=%~dp0"
 set "BACKEND_DIR=%PROJECT_DIR%xinda-backend"
 set "FRONTEND_DIR=%PROJECT_DIR%xinda-frontend"
 
-REM 检查 Node.js
-echo [步骤 1/4] 检查 Node.js...
+REM Function to install Node.js
+echo [Step 1/4] Check Node.js...
 where node >nul 2>&1
-if %errorlevel% neq 0 (
+if %errorlevel% equ 0 (
+    echo OK - Node.js found:
+    node --version
     echo.
-    echo 错误: 未安装 Node.js
-    echo 请从 https://nodejs.org/ 下载并安装 Node.js LTS 版本
-    echo.
+    goto :node_done
+)
+
+echo Node.js not found. Installing Node.js 22...
+where winget >nul 2>&1
+if %errorlevel% equ 0 (
+    echo Using winget to install Node.js 22...
+    winget install OpenJS.NodeJS.LTS --accept-source-agreements --accept-package-agreements
+    if %errorlevel% equ 0 (
+        echo SUCCESS: Node.js 22 installed
+        echo Please close this window and run the script again to continue.
+        pause
+        exit /b 0
+    ) else (
+        echo WARNING: winget installation failed. Please install manually from https://nodejs.org/
+        pause
+        exit /b 1
+    )
+) else (
+    echo WARNING: winget not available. Please install Node.js manually from https://nodejs.org/
     pause
     exit /b 1
 )
-echo Node.js 已安装:
-node --version
-echo.
 
-REM 检查 Python
-echo [步骤 2/4] 检查 Python...
+:node_done
+
+REM Function to install Python
+echo [Step 2/4] Check Python...
 where python >nul 2>&1
-if %errorlevel% neq 0 (
+if %errorlevel% equ 0 (
+    echo OK - Python found:
+    python --version
     echo.
-    echo 错误: 未安装 Python
-    echo 请从 https://www.python.org/downloads/ 下载并安装 Python 3.9+
-    echo.
+    goto :python_done
+)
+
+echo Python not found. Installing Python 3.13...
+where winget >nul 2>&1
+if %errorlevel% equ 0 (
+    echo Using winget to install Python 3.13...
+    winget install Python.Python.3.13 --accept-source-agreements --accept-package-agreements
+    if %errorlevel% equ 0 (
+        echo SUCCESS: Python 3.13 installed
+        echo Please close this window and run the script again to continue.
+        pause
+        exit /b 0
+    ) else (
+        echo WARNING: winget installation failed. Please install manually from https://www.python.org/downloads/
+        pause
+        exit /b 1
+    )
+) else (
+    echo WARNING: winget not available. Please install Python manually from https://www.python.org/downloads/
     pause
     exit /b 1
 )
-echo Python 已安装:
-python --version
-echo.
 
-REM 安装后端依赖
-echo [步骤 3/4] 安装后端依赖...
+:python_done
+
+echo [Step 3/4] Backend dependencies...
 cd /d "%BACKEND_DIR%"
 if not exist "venv" (
-    echo 创建 Python 虚拟环境...
+    echo Creating venv...
     python -m venv venv
 )
-
 call venv\Scripts\activate.bat
-echo 安装 Python 包（这可能需要几分钟）...
-pip install -q fastapi "uvicorn[standard]" python-multipart sqlalchemy pillow python-docx PyPDF2 PyMuPDF requests python-dotenv httpx
+echo Installing Python packages...
+pip install -q fastapi uvicorn python-multipart sqlalchemy pillow python-docx PyPDF2 PyMuPDF requests python-dotenv httpx
 if %errorlevel% neq 0 (
-    echo 错误: Python 依赖安装失败
+    echo ERROR: pip install failed
     cd /d "%PROJECT_DIR%"
     pause
     exit /b 1
 )
-
 if not exist "uploads" mkdir uploads
 if not exist "data" mkdir data
-echo 后端依赖已安装
+echo OK - Backend ready
 echo.
 
-REM 安装前端依赖
-echo [步骤 4/4] 安装前端依赖...
+echo [Step 4/4] Frontend dependencies...
 cd /d "%FRONTEND_DIR%"
 if not exist "node_modules" (
-    echo 安装 Node.js 依赖（这可能需要几分钟）...
+    echo Installing npm packages...
     npm install --silent
     if %errorlevel% neq 0 (
-        echo 错误: Node.js 依赖安装失败
+        echo ERROR: npm install failed
         cd /d "%PROJECT_DIR%"
         pause
         exit /b 1
     )
 )
-
-REM 确保使用稳定版本的 Next.js
-echo 检查 Next.js 版本...
+echo Check Next.js version...
 call npm list next | findstr "15.2.4" >nul 2>&1
 if %errorlevel% neq 0 (
-    echo 警告: Next.js 版本不是 15.2.4，正在安装稳定版本...
+    echo Installing stable Next.js...
     call npm install next@15.2.4 eslint-config-next@15.2.4 --save
 )
-echo 前端依赖已安装（Next.js 15.2.4）
+echo OK - Frontend ready (Next.js 15.2.4)
 echo.
 
 cd /d "%PROJECT_DIR%"
 echo ====================================
-echo   启动服务
+echo   Start Services
 echo ====================================
 echo.
 
-REM 启动后端服务
-echo [1/2] 启动后端服务（端口 8000）...
-start "信达后端" cmd /k "cd /d "%BACKEND_DIR%" && call venv\Scripts\activate.bat && python -m uvicorn main:app --reload --host 0.0.0.0 --port 8000"
+echo [1/2] Starting Backend (port 8000)...
+cd /d "%BACKEND_DIR%"
+call venv\Scripts\activate.bat
+start /b python -m uvicorn main:app --reload --host 0.0.0.0 --port 8000
+cd /d "%PROJECT_DIR%"
 timeout /t 3 /nobreak >nul
+echo Backend started (background)
 
-REM 启动前端服务
-echo [2/2] 启动前端服务（端口 3000）...
-start "信达前端" cmd /k "cd /d "%FRONTEND_DIR%" && npm run dev"
+echo [2/2] Starting Frontend (port 3000)...
+cd /d "%FRONTEND_DIR%"
+start /b npm run dev
+cd /d "%PROJECT_DIR%"
 timeout /t 5 /nobreak >nul
+echo Frontend started (background)
 
 echo.
 echo ====================================
-echo   服务启动完成！
+echo   Services Running
 echo ====================================
 echo.
-echo 前端地址: http://localhost:3000
-echo 后端地址: http://localhost:8000
-echo API文档:  http://localhost:8000/docs
+echo Frontend: http://localhost:3000
+echo Backend:  http://localhost:8000
+echo API Docs: http://localhost:8000/docs
 echo.
 
-REM 自动打开浏览器
-echo 正在打开浏览器...
+echo Opening browser in 2 seconds...
 timeout /t 2 /nobreak >nul
 start http://localhost:3000
-echo 浏览器已打开
+
 echo.
 echo ====================================
-echo   使用说明
+echo   RUNNING - Press Ctrl+C to stop
 echo ====================================
 echo.
-echo - 程序已在两个独立窗口中运行
-echo - 请勿关闭这两个命令行窗口
-echo - 按 Ctrl+C 可停止服务
-echo - 首次启动需要等待 1-2 分钟编译
+echo Services are running in background.
+echo Close this window to stop all services.
 echo.
-pause
+
+REM Keep the window open
+cmd /k
