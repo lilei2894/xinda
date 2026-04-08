@@ -50,7 +50,23 @@ if %errorlevel% equ 0 (
     echo Note: If winget fails, please install manually from https://nodejs.org/
     echo.
     winget install OpenJS.NodeJS.LTS --accept-source-agreements --accept-package-agreements 2>nul
+    
     if %errorlevel% equ 0 (
+        echo.
+        echo Adding Node.js to PATH...
+        
+        REM Get Node.js installation path
+        set "NODE_PATH=%ProgramFiles%\nodejs"
+        if exist "%NODE_PATH%" (
+            REM Add to PATH for current session
+            set "PATH=%NODE_PATH%;%PATH%"
+            
+            REM Add to user PATH permanently
+            powershell -Command "[Environment]::SetEnvironmentVariable('PATH', [Environment]::GetEnvironmentVariable('PATH', 'User') + ';%NODE_PATH%', 'User')" 2>nul
+            
+            echo Node.js added to PATH successfully.
+        )
+        
         echo.
         echo ========================================
         echo   SUCCESS: Node.js 22 installed
@@ -114,8 +130,24 @@ if %errorlevel% equ 0 (
     echo This may take a few minutes...
     echo Note: If winget fails, please install manually from https://www.python.org/downloads/
     echo.
-    winget install Python.Python.3.13 --accept-source-agreements --accept-package-agreements 2>nul
+    winget install Python.Python.3.13 --accept-source-agreements --accept-package-agreements --override "/quiet InstallAllUsers=0 PrependPath=1 Include_test=0" 2>nul
+    
     if %errorlevel% equ 0 (
+        echo.
+        echo Adding Python to PATH...
+        
+        REM Get Python installation path
+        set "PYTHON_PATH=%LOCALAPPDATA%\Programs\Python\Python313"
+        if exist "%PYTHON_PATH%" (
+            REM Add to PATH for current session
+            set "PATH=%PYTHON_PATH%;%PYTHON_PATH%\Scripts;%PATH%"
+            
+            REM Add to user PATH permanently
+            powershell -Command "[Environment]::SetEnvironmentVariable('PATH', [Environment]::GetEnvironmentVariable('PATH', 'User') + ';%PYTHON_PATH%;%PYTHON_PATH%\Scripts', 'User')" 2>nul
+            
+            echo Python added to PATH successfully.
+        )
+        
         echo.
         echo ========================================
         echo   SUCCESS: Python 3.13 installed
@@ -141,7 +173,7 @@ if %errorlevel% equ 0 (
         echo Solution - Install Python manually:
         echo   1. Download from: https://www.python.org/downloads/
         echo   2. Run the installer as Administrator
-        echo   3. Check "Add Python to PATH" during installation
+        echo   3. IMPORTANT: Check "Add Python to PATH" during installation
         echo   4. Restart this script
         echo.
         pause
@@ -155,7 +187,7 @@ if %errorlevel% equ 0 (
     echo Solution - Install Python manually:
     echo   1. Download from: https://www.python.org/downloads/
     echo   2. Run the installer
-    echo   3. Check "Add Python to PATH" during installation
+    echo   3. IMPORTANT: Check "Add Python to PATH" during installation
     echo   4. Restart this script
     echo.
     pause
