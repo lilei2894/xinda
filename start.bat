@@ -1,8 +1,30 @@
 @echo off
-setlocal
+setlocal enabledelayedexpansion
 
+:: Check for administrator privileges
+net session >nul 2>&1
+if %errorlevel% equ 0 goto :admin_ok
+
+:: Not running as admin - elevate
+echo =========================================
+echo   Administrator Privileges Required
+echo =========================================
+echo.
+echo This script needs administrator privileges to install:
+echo   - Node.js 22 LTS
+echo   - Python 3.13
+echo.
+echo Requesting administrator privileges...
+echo.
+
+:: Try to elevate using PowerShell
+powershell -Command "Start-Process '%~f0' -Verb RunAs"
+exit /b
+
+:admin_ok
 echo ====================================
 echo   Xinda Project Launcher
+echo   (Running as Administrator)
 echo ====================================
 echo.
 
@@ -25,7 +47,9 @@ where winget >nul 2>&1
 if %errorlevel% equ 0 (
     echo Using winget to install Node.js 22...
     echo This may take a few minutes...
-    winget install OpenJS.NodeJS.LTS --accept-source-agreements --accept-package-agreements
+    echo Note: If winget fails, please install manually from https://nodejs.org/
+    echo.
+    winget install OpenJS.NodeJS.LTS --accept-source-agreements --accept-package-agreements 2>nul
     if %errorlevel% equ 0 (
         echo.
         echo ========================================
@@ -42,12 +66,31 @@ if %errorlevel% equ 0 (
         pause
         exit /b 0
     ) else (
-        echo WARNING: winget installation failed. Please install manually from https://nodejs.org/
+        echo.
+        echo ========================================
+        echo   WARNING: winget installation failed
+        echo ========================================
+        echo.
+        echo This is likely due to permission restrictions.
+        echo.
+        echo Solution - Install Node.js manually:
+        echo   1. Download from: https://nodejs.org/
+        echo   2. Run the installer as Administrator
+        echo   3. Restart this script
+        echo.
         pause
         exit /b 1
     )
 ) else (
-    echo WARNING: winget not available. Please install Node.js manually from https://nodejs.org/
+    echo ========================================
+    echo   winget not available
+    echo ========================================
+    echo.
+    echo Solution - Install Node.js manually:
+    echo   1. Download from: https://nodejs.org/
+    echo   2. Run the installer
+    echo   3. Restart this script
+    echo.
     pause
     exit /b 1
 )
@@ -69,7 +112,9 @@ where winget >nul 2>&1
 if %errorlevel% equ 0 (
     echo Using winget to install Python 3.13...
     echo This may take a few minutes...
-    winget install Python.Python.3.13 --accept-source-agreements --accept-package-agreements
+    echo Note: If winget fails, please install manually from https://www.python.org/downloads/
+    echo.
+    winget install Python.Python.3.13 --accept-source-agreements --accept-package-agreements 2>nul
     if %errorlevel% equ 0 (
         echo.
         echo ========================================
@@ -86,12 +131,33 @@ if %errorlevel% equ 0 (
         pause
         exit /b 0
     ) else (
-        echo WARNING: winget installation failed. Please install manually from https://www.python.org/downloads/
+        echo.
+        echo ========================================
+        echo   WARNING: winget installation failed
+        echo ========================================
+        echo.
+        echo This is likely due to permission restrictions.
+        echo.
+        echo Solution - Install Python manually:
+        echo   1. Download from: https://www.python.org/downloads/
+        echo   2. Run the installer as Administrator
+        echo   3. Check "Add Python to PATH" during installation
+        echo   4. Restart this script
+        echo.
         pause
         exit /b 1
     )
 ) else (
-    echo WARNING: winget not available. Please install Python manually from https://www.python.org/downloads/
+    echo ========================================
+    echo   winget not available
+    echo ========================================
+    echo.
+    echo Solution - Install Python manually:
+    echo   1. Download from: https://www.python.org/downloads/
+    echo   2. Run the installer
+    echo   3. Check "Add Python to PATH" during installation
+    echo   4. Restart this script
+    echo.
     pause
     exit /b 1
 )
