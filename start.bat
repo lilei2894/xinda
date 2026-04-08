@@ -1,8 +1,9 @@
 @echo off
+chcp 65001 >nul
 setlocal
 
 echo ====================================
-echo   Xinda Project Launcher
+echo   信达 - 启动脚本
 echo ====================================
 echo.
 
@@ -10,25 +11,26 @@ set "PROJECT_DIR=%~dp0"
 set "BACKEND_DIR=%PROJECT_DIR%xinda-backend"
 set "FRONTEND_DIR=%PROJECT_DIR%xinda-frontend"
 
-echo DEBUG: PROJECT_DIR = %PROJECT_DIR%
-echo DEBUG: BACKEND_DIR = %BACKEND_DIR%
-echo.
-
-echo [Step 1/4] Check Node.js...
-node --version >nul 2>&1
+echo [Step 1/4] 检测 Node.js...
+where node >nul 2>&1
 if %errorlevel% neq 0 (
-    echo Node.js not found. Please install Node.js 22 from: https://nodejs.org/
     echo.
-    echo Then run this script again.
+    echo 错误: 未安装 Node.js
+    echo.
+    echo 请从以下地址下载并安装 Node.js 22 LTS:
+    echo   https://nodejs.org/
+    echo.
+    echo 安装完成后，重新运行此脚本。
+    echo.
     pause
     exit /b 1
 )
-echo OK - Node.js:
+echo OK - Node.js 版本:
 node --version
 echo.
 
-echo [Step 2/4] Check Python...
-python --version >nul 2>&1
+echo [Step 2/4] 检测 Python...
+where python >nul 2>&1
 if %errorlevel% neq 0 (
     python3 --version >nul 2>&1
 )
@@ -36,88 +38,114 @@ if %errorlevel% neq 0 (
     py --version >nul 2>&1
 )
 if %errorlevel% neq 0 (
-    echo Python not found. Please install Python 3.13 from: https://www.python.org/downloads/
-    echo IMPORTANT: Check "Add Python to PATH" during installation!
     echo.
-    echo Then run this script again.
+    echo 错误: 未安装 Python
+    echo.
+    echo 请从以下地址下载并安装 Python 3.13:
+    echo   https://www.python.org/downloads/
+    echo.
+    echo 安装时请勾选 "Add Python to PATH" 选项！
+    echo.
+    echo 安装完成后，重新运行此脚本。
+    echo.
     pause
     exit /b 1
 )
-echo OK - Python:
+echo OK - Python 版本:
 python --version
 echo.
 
-echo [Step 3/4] Backend dependencies...
+echo [Step 3/4] 安装后端依赖...
 cd /d "%BACKEND_DIR%"
 if not exist "venv" (
-    echo Creating venv...
+    echo 创建 Python 虚拟环境...
     python -m venv venv
-)
-call venv\Scripts\activate.bat
-echo Installing Python packages...
-pip install -q fastapi uvicorn python-multipart sqlalchemy pillow python-docx PyPDF2 PyMuPDF requests python-dotenv httpx
-if %errorlevel% neq 0 (
-    echo ERROR: pip install failed
-    pause
-    exit /b 1
-)
-if not exist "uploads" mkdir uploads
-if not exist "data" mkdir data
-echo OK - Backend ready
-echo.
-
-echo [Step 4/4] Frontend dependencies...
-cd /d "%FRONTEND_DIR%"
-if not exist "node_modules" (
-    echo Installing npm packages...
-    npm install --silent
     if %errorlevel% neq 0 (
-        echo ERROR: npm install failed
+        echo 错误: 创建虚拟环境失败
         pause
         exit /b 1
     )
 )
-echo Check Next.js version...
+
+call venv\Scripts\activate.bat
+echo 安装 Python 包（首次运行需要几分钟）...
+pip install -q fastapi uvicorn python-multipart sqlalchemy pillow python-docx PyPDF2 PyMuPDF requests python-dotenv httpx
+if %errorlevel% neq 0 (
+    echo 错误: pip 安装失败
+    pause
+    exit /b 1
+)
+
+if not exist "uploads" mkdir uploads
+if not exist "data" mkdir data
+echo OK - 后端依赖安装完成
+echo.
+
+echo [Step 4/4] 安装前端依赖...
+cd /d "%FRONTEND_DIR%"
+if not exist "node_modules" (
+    echo 安装 Node.js 包（首次运行需要几分钟）...
+    npm install --silent
+    if %errorlevel% neq 0 (
+        echo 错误: npm 安装失败
+        pause
+        exit /b 1
+    )
+)
+
+echo 检查 Next.js 版本...
 call npm list next | findstr "15.2.4" >nul 2>&1
 if %errorlevel% neq 0 (
-    echo Installing stable Next.js...
+    echo 安装稳定版 Next.js 15.2.4...
     call npm install next@15.2.4 eslint-config-next@15.2.4 --save
 )
-echo OK - Frontend ready
+echo OK - 前端依赖安装完成（Next.js 15.2.4）
 echo.
 
 cd /d "%PROJECT_DIR%"
 echo ====================================
-echo   Start Services
+echo   启动服务
 echo ====================================
 echo.
 
-echo [1/2] Starting Backend (port 8000)...
+echo [1/2] 启动后端服务（端口 8000）...
 cd /d "%BACKEND_DIR%"
 call venv\Scripts\activate.bat
 start /b python -m uvicorn main:app --reload --host 0.0.0.0 --port 8000
 cd /d "%PROJECT_DIR%"
 timeout /t 3 /nobreak >nul
-echo Backend started
+echo 后端服务已启动
 
-echo [2/2] Starting Frontend (port 3000)...
+echo [2/2] 启动前端服务（端口 3000）...
 cd /d "%FRONTEND_DIR%"
 start /b npm run dev
 cd /d "%PROJECT_DIR%"
 timeout /t 5 /nobreak >nul
-echo Frontend started
+echo 前端服务已启动
 
 echo.
 echo ====================================
-echo   DONE
+echo   服务运行中
 echo ====================================
 echo.
-echo Frontend: http://localhost:3000
-echo Backend:  http://localhost:8000
+echo 前端地址: http://localhost:3000
+echo 后端地址: http://localhost:8000
+echo API文档:  http://localhost:8000/docs
 echo.
 
-echo Opening browser...
+echo 正在打开浏览器...
+timeout /t 2 /nobreak >nul
 start http://localhost:3000
+echo 浏览器已打开
 echo.
-echo Press Enter to exit...
+
+echo ====================================
+echo   使用说明
+echo ====================================
+echo.
+echo - 服务在后台运行
+echo - 关闭此窗口可停止所有服务
+echo - 首次启动需等待编译（1-2分钟）
+echo.
+echo 按任意键退出...
 pause >nul
