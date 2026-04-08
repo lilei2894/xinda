@@ -24,10 +24,21 @@ echo Node.js not found. Installing Node.js 22...
 where winget >nul 2>&1
 if %errorlevel% equ 0 (
     echo Using winget to install Node.js 22...
+    echo This may take a few minutes...
     winget install OpenJS.NodeJS.LTS --accept-source-agreements --accept-package-agreements
     if %errorlevel% equ 0 (
-        echo SUCCESS: Node.js 22 installed
-        echo Please close this window and run the script again to continue.
+        echo.
+        echo ========================================
+        echo   SUCCESS: Node.js 22 installed
+        echo ========================================
+        echo.
+        echo IMPORTANT: You must restart this script for PATH to refresh.
+        echo.
+        echo Please:
+        echo   1. Close this command window
+        echo   2. Open a NEW command window
+        echo   3. Run this script again
+        echo.
         pause
         exit /b 0
     ) else (
@@ -57,10 +68,21 @@ echo Python not found. Installing Python 3.13...
 where winget >nul 2>&1
 if %errorlevel% equ 0 (
     echo Using winget to install Python 3.13...
+    echo This may take a few minutes...
     winget install Python.Python.3.13 --accept-source-agreements --accept-package-agreements
     if %errorlevel% equ 0 (
-        echo SUCCESS: Python 3.13 installed
-        echo Please close this window and run the script again to continue.
+        echo.
+        echo ========================================
+        echo   SUCCESS: Python 3.13 installed
+        echo ========================================
+        echo.
+        echo IMPORTANT: You must restart this script for PATH to refresh.
+        echo.
+        echo Please:
+        echo   1. Close this command window
+        echo   2. Open a NEW command window
+        echo   3. Run this script again
+        echo.
         pause
         exit /b 0
     ) else (
@@ -77,6 +99,27 @@ if %errorlevel% equ 0 (
 :python_done
 
 echo [Step 3/4] Backend dependencies...
+echo Verifying Python installation...
+python --version >nul 2>&1
+if %errorlevel% neq 0 (
+    echo.
+    echo ========================================
+    echo   ERROR: Python installed but not found
+    echo ========================================
+    echo.
+    echo Python was installed but the PATH environment variable was not refreshed.
+    echo.
+    echo Solution:
+    echo   1. Close this command window
+    echo   2. Open a NEW command window  
+    echo   3. Run: python --version
+    echo   4. If Python version shows, run this script again
+    echo   5. If not, add Python to PATH manually
+    echo.
+    pause
+    exit /b 1
+)
+
 cd /d "%BACKEND_DIR%"
 if not exist "venv" (
     echo Creating venv...
@@ -118,6 +161,38 @@ echo OK - Frontend ready (Next.js 15.2.4)
 echo.
 
 cd /d "%PROJECT_DIR%"
+
+echo ====================================
+echo   Verifying Environment
+echo ====================================
+echo.
+
+echo Final check: Python...
+python --version >nul 2>&1
+if %errorlevel% neq 0 (
+    echo ERROR: Python not accessible in PATH
+    echo Please restart the script in a new command window.
+    pause
+    exit /b 1
+)
+python --version
+
+echo.
+echo Final check: Node.js...
+node --version >nul 2>&1
+if %errorlevel% neq 0 (
+    echo ERROR: Node.js not accessible in PATH
+    echo Please restart the script in a new command window.
+    pause
+    exit /b 1
+)
+node --version
+
+echo.
+echo ====================================
+echo   Environment Ready
+echo ====================================
+echo.
 echo ====================================
 echo   Start Services
 echo ====================================
