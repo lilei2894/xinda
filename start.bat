@@ -92,14 +92,7 @@ if not exist "node_modules" (
         exit /b 1
     )
 )
-
-echo 检查 Next.js 版本...
-call npm list next | findstr "15.2.4" >nul 2>&1
-if %errorlevel% neq 0 (
-    echo 安装稳定版 Next.js 15.2.4...
-    call npm install next@15.2.4 eslint-config-next@15.2.4 --save
-)
-echo OK - 前端依赖安装完成（Next.js 15.2.4）
+echo OK - 前端依赖安装完成
 echo.
 
 cd /d "%PROJECT_DIR%"
@@ -118,7 +111,7 @@ echo 后端服务已启动
 
 echo [2/2] 启动前端服务（端口 3000）...
 cd /d "%FRONTEND_DIR%"
-start /b npm run dev
+start /b npm run dev -- --webpack
 cd /d "%PROJECT_DIR%"
 timeout /t 5 /nobreak >nul
 echo 前端服务已启动
