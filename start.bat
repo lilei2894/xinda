@@ -22,8 +22,7 @@ if %errorlevel% neq 0 (
     echo.
     echo 安装完成后，重新运行此脚本。
     echo.
-    pause
-    exit /b 1
+    goto :end
 )
 echo OK - Node.js 版本:
 node --version
@@ -48,8 +47,7 @@ if %errorlevel% neq 0 (
     echo.
     echo 安装完成后，重新运行此脚本。
     echo.
-    pause
-    exit /b 1
+    goto :end
 )
 echo OK - Python 版本:
 python --version
@@ -62,8 +60,8 @@ if not exist "venv" (
     python -m venv venv
     if %errorlevel% neq 0 (
         echo 错误: 创建虚拟环境失败
-        pause
-        exit /b 1
+        echo 可能原因: Python 未正确安装或版本过低
+        goto :end
     )
 )
 
@@ -72,8 +70,8 @@ echo 安装 Python 包（首次运行需要几分钟）...
 pip install -q fastapi uvicorn python-multipart sqlalchemy pillow python-docx PyPDF2 PyMuPDF requests python-dotenv httpx
 if %errorlevel% neq 0 (
     echo 错误: pip 安装失败
-    pause
-    exit /b 1
+    echo 可能原因: 网络问题或 pip 版本过低
+    goto :end
 )
 
 if not exist "uploads" mkdir uploads
@@ -88,8 +86,8 @@ if not exist "node_modules" (
     npm install --silent
     if %errorlevel% neq 0 (
         echo 错误: npm 安装失败
-        pause
-        exit /b 1
+        echo 可能原因: 网络问题或 npm 版本过低
+        goto :end
     )
 )
 echo OK - 前端依赖安装完成
