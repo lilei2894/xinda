@@ -135,24 +135,15 @@ echo.
 
 echo [1/2] Starting backend (port 8000)...
 cd /d "%BACKEND_DIR%"
-start "Backend" cmd /c "venv\Scripts\python.exe -m uvicorn main:app --reload --host 0.0.0.0 --port 8000"
+start "" /b venv\Scripts\python.exe -m uvicorn main:app --reload --host 0.0.0.0 --port 8000
 cd /d "%PROJECT_DIR%"
-echo Waiting for backend...
 timeout /t 5 /nobreak >nul
-echo Backend started
-
-echo Checking backend health...
-curl -s http://localhost:8000/health >nul 2>&1
-if %errorlevel% neq 0 (
-    echo WARNING: Backend may not be ready yet
-)
 
 echo [2/2] Starting frontend (port 3000)...
 cd /d "%FRONTEND_DIR%"
-start "Frontend" cmd /c "npm run dev"
+start "" /b npm run dev
 cd /d "%PROJECT_DIR%"
 timeout /t 5 /nobreak >nul
-echo Frontend started
 
 echo.
 echo ====================================
