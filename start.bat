@@ -69,16 +69,11 @@ if not exist "%PYTHON%" (
     goto :end
 )
 
-echo Checking uv (fast Python installer)...
-where uv >nul 2>&1
-if %errorlevel% neq 0 (
-    echo Installing uv...
-    "%PYTHON%" -m pip install uv
-)
-echo Installing Python packages with uv (faster)...
+echo Installing Python packages...
+echo This may take several minutes, please wait...
 echo.
 
-"%PYTHON%" -m uv pip install fastapi uvicorn python-multipart sqlalchemy pillow python-docx PyPDF2 PyMuPDF requests python-dotenv httpx
+"%PYTHON%" -m pip install fastapi uvicorn python-multipart sqlalchemy pillow python-docx PyPDF2 PyMuPDF requests python-dotenv httpx
 
 if %errorlevel% neq 0 (
     echo.
@@ -116,7 +111,7 @@ if not exist "node_modules" (
     echo This may take several minutes, please wait...
     echo.
     
-    call npm install
+    cmd /c "npm install"
     
     if %errorlevel% neq 0 (
         echo.
