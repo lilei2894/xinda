@@ -96,35 +96,19 @@ echo.
 
 echo [Step 4/4] Install frontend dependencies...
 cd /d "%FRONTEND_DIR%"
-echo Current directory: %cd%
+echo Installing in: %cd%
 echo.
 
 if not exist "node_modules" (
-    echo Checking npm...
-    where npm >nul 2>&1
+    echo Running npm install, please wait...
+    npm install
     if %errorlevel% neq 0 (
-        echo ERROR: npm not found
-        goto :end
-    )
-    
-    echo Installing Node.js packages...
-    echo This may take several minutes, please wait...
-    echo.
-    
-    cmd /c "npm install"
-    
-    if %errorlevel% neq 0 (
-        echo.
         echo ERROR: npm install failed
-        echo.
         goto :end
     )
-    
     echo OK - Frontend dependencies installed
-    echo.
 ) else (
-    echo node_modules already exists, skipping
-    echo.
+    echo node_modules exists, skipping
 )
 
 cd /d "%PROJECT_DIR%"
