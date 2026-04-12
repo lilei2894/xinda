@@ -174,14 +174,13 @@ export default function PDFViewer({ fileUrl, currentPage, onPageChange, scale = 
             >
               <div
                 style={{
-                  transform: `translate(${pan.x}px, ${pan.y}px) scale(${effectiveScale})`,
-                  transformOrigin: 'center center',
+                  transform: `translate(${pan.x}px, ${pan.y}px)`,
                   transition: isPanning ? 'none' : 'transform 0.1s ease-out'
                 }}
               >
                 <Page
                   pageNumber={currentPage}
-                  scale={1}
+                  scale={effectiveScale}
                   className="shadow-lg"
                   renderTextLayer={false}
                   renderAnnotationLayer={false}
