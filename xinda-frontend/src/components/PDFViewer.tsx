@@ -15,6 +15,7 @@ interface PDFViewerProps {
 export default function PDFViewer({ fileUrl, currentPage, onPageChange, scale = 1.0 }: PDFViewerProps) {
   const [numPages, setNumPages] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
+  const [workerReady, setWorkerReady] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
   const [pan, setPan] = useState({ x: 0, y: 0 });
@@ -28,6 +29,7 @@ export default function PDFViewer({ fileUrl, currentPage, onPageChange, scale = 
       import('pdfjs-dist').then((pdfjs) => {
         pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
         workerSet.current = true;
+        setWorkerReady(true);
       }).catch(console.error);
     }
   }, []);
@@ -141,6 +143,10 @@ export default function PDFViewer({ fileUrl, currentPage, onPageChange, scale = 
                 点击在新窗口打开
               </a>
             </div>
+          </div>
+        ) : !workerReady ? (
+          <div className="flex items-center justify-center h-64">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
           </div>
         ) : (
           <div 
