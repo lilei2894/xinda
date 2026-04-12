@@ -142,7 +142,7 @@ echo Backend started
 
 echo [2/2] Starting frontend (port 3000)...
 cd /d "%FRONTEND_DIR%"
-start /b npm run dev -- --webpack
+start /b npm run dev
 cd /d "%PROJECT_DIR%"
 timeout /t 5 /nobreak >nul
 echo Frontend started
