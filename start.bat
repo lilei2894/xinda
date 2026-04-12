@@ -1,5 +1,5 @@
 @echo off
-setlocal
+setlocal EnableDelayedExpansion
 
 echo ====================================
 echo   Xinda Project Launcher
@@ -111,7 +111,7 @@ if not exist "node_modules" (
     echo This may take several minutes, please wait...
     echo.
     
-    npm install
+    call npm install
     
     if %errorlevel% neq 0 (
         echo.
@@ -135,14 +135,14 @@ echo.
 
 echo [1/2] Starting backend (port 8000)...
 cd /d "%BACKEND_DIR%"
-start /b venv\Scripts\python.exe -m uvicorn main:app --reload --host 0.0.0.0 --port 8000
+start /b cmd /c "venv\Scripts\python.exe -m uvicorn main:app --reload --host 0.0.0.0 --port 8000"
 cd /d "%PROJECT_DIR%"
 timeout /t 3 /nobreak >nul
 echo Backend started
 
 echo [2/2] Starting frontend (port 3000)...
 cd /d "%FRONTEND_DIR%"
-start /b npm run dev
+start /b cmd /c "npm run dev"
 cd /d "%PROJECT_DIR%"
 timeout /t 5 /nobreak >nul
 echo Frontend started
@@ -164,14 +164,13 @@ echo Browser opened
 echo.
 
 echo ====================================
-echo   Instructions
+echo   SUCCESS - All Done!
 echo ====================================
 echo.
-echo - Services are running in background
-echo - Close this window to stop all services
-echo - First startup may take 1-2 minutes to compile
+echo Services are running in background
+echo Close this window to stop all services
 echo.
+echo Press any key to exit...
 
 :end
-echo Press any key to exit...
 pause >nul
