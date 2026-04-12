@@ -12,11 +12,15 @@ interface PDFViewerProps {
   scale?: number;
 }
 
-if (typeof window !== 'undefined') {
-  pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.mjs`;
+// Use local worker file
+function usePDFWorker() {
+  useEffect(() => {
+    pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
+  }, []);
 }
 
 export default function PDFViewer({ fileUrl, currentPage, onPageChange, scale = 1.0 }: PDFViewerProps) {
+  usePDFWorker();
   const [numPages, setNumPages] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
