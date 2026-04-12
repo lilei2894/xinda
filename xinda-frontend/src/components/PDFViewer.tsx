@@ -12,7 +12,9 @@ interface PDFViewerProps {
   scale?: number;
 }
 
-pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
+if (typeof window !== 'undefined') {
+  pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.mjs`;
+}
 
 export default function PDFViewer({ fileUrl, currentPage, onPageChange, scale = 1.0 }: PDFViewerProps) {
   const [numPages, setNumPages] = useState<number>(0);
