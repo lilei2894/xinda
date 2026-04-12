@@ -9,40 +9,24 @@ interface PDFViewerProps {
   scale?: number;
 }
 
-function LoadingSpinner() {
-  return (
-    <div className="flex items-center justify-center h-64">
-      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-    </div>
-  );
-}
-
 export default function PDFViewer({ fileUrl, currentPage, onPageChange, scale = 1.0 }: PDFViewerProps) {
   const [error, setError] = useState<string | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
 
   useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
+    const iframe = iframeRef.current;
+    if (!iframe) return;
     
-    const updateSize = () => {
-      setContainerSize({ width: container.clientWidth, height: container.clientHeight });
-    };
-    
-    updateSize();
-    const resizeObserver = new ResizeObserver(updateSize);
-    resizeObserver.observe(container);
-    return () => resizeObserver.disconnect();
+    const handleLoad = () => console.log('PDF loaded');
+    iframe.addEventListener('load', handleLoad);
+    return () => iframe.removeEventListener('load', handleLoad);
   }, []);
 
-  const effectiveScale = scale <= 0 ? 1.0 : scale;
+  const pdfUrl = `${fileUrl}#page=${currentPage}`;
 
   return (
     <div className="w-full h-full flex flex-col">
-      <div 
-        ref={containerRef} 
-        className="flex-1 bg-gray-200 overflow-hidden"
-      >
+      <div className="flex-1 bg-gray-200 overflow-hidden">
         {error ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center p-8">
@@ -59,10 +43,10 @@ export default function PDFViewer({ fileUrl, currentPage, onPageChange, scale = 
           </div>
         ) : (
           <iframe
-            src={`${fileUrl}#page=${currentPage}`}
+            ref={iframeRef}
+            src={pdfUrl}
             className="w-full h-full border-0"
-            style={{ transform: `scale(${effectiveScale})`, transformOrigin: 'top left' }}
-            onLoad={() => setLoading(false)}
+            style={{ transform: `scale(${scale})`, transformOrigin: 'top left' }}
             onError={() => setError('PDF 加载失败')}
           />
         )}
