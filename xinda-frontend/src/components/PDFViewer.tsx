@@ -9,7 +9,7 @@ interface PDFViewerProps {
   scale?: number;
 }
 
-function Loading-spinner() {
+function LoadingSpinner() {
   return (
     <div className="flex items-center justify-center h-64">
       <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
@@ -18,10 +18,8 @@ function Loading-spinner() {
 }
 
 export default function PDFViewer({ fileUrl, currentPage, onPageChange, scale = 1.0 }: PDFViewerProps) {
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
 
   useEffect(() => {
     const container = containerRef.current;
