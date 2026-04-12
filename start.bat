@@ -138,5 +138,7 @@ echo - 服务在后台运行
 echo - 关闭此窗口可停止所有服务
 echo - 首次启动需等待编译（1-2分钟）
 echo.
+
+:end
 echo 按任意键退出...
 pause >nul
