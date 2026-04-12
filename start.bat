@@ -1,9 +1,8 @@
 @echo off
-chcp 65001 >nul
 setlocal
 
 echo ====================================
-echo   信达 - 启动脚本
+echo   Xinda Project Launcher
 echo ====================================
 echo.
 
@@ -11,24 +10,24 @@ set "PROJECT_DIR=%~dp0"
 set "BACKEND_DIR=%PROJECT_DIR%xinda-backend"
 set "FRONTEND_DIR=%PROJECT_DIR%xinda-frontend"
 
-echo [Step 1/4] 检测 Node.js...
+echo [Step 1/4] Check Node.js...
 where node >nul 2>&1
 if %errorlevel% neq 0 (
     echo.
-    echo 错误: 未安装 Node.js
+    echo ERROR: Node.js not installed
     echo.
-    echo 请从以下地址下载并安装 Node.js 22 LTS:
+    echo Please download and install Node.js 22 LTS:
     echo   https://nodejs.org/
     echo.
-    echo 安装完成后，重新运行此脚本。
+    echo After installation, run this script again.
     echo.
     goto :end
 )
-echo OK - Node.js 版本:
+echo OK - Node.js version:
 node --version
 echo.
 
-echo [Step 2/4] 检测 Python...
+echo [Step 2/4] Check Python...
 where python >nul 2>&1
 if %errorlevel% neq 0 (
     python3 --version >nul 2>&1
@@ -38,107 +37,107 @@ if %errorlevel% neq 0 (
 )
 if %errorlevel% neq 0 (
     echo.
-    echo 错误: 未安装 Python
+    echo ERROR: Python not installed
     echo.
-    echo 请从以下地址下载并安装 Python 3.13:
+    echo Please download and install Python 3.13:
     echo   https://www.python.org/downloads/
     echo.
-    echo 安装时请勾选 "Add Python to PATH" 选项！
+    echo IMPORTANT: Check "Add Python to PATH" during installation!
     echo.
-    echo 安装完成后，重新运行此脚本。
+    echo After installation, run this script again.
     echo.
     goto :end
 )
-echo OK - Python 版本:
+echo OK - Python version:
 python --version
 echo.
 
-echo [Step 3/4] 安装后端依赖...
+echo [Step 3/4] Install backend dependencies...
 cd /d "%BACKEND_DIR%"
 if not exist "venv" (
-    echo 创建 Python 虚拟环境...
+    echo Creating Python virtual environment...
     python -m venv venv
     if %errorlevel% neq 0 (
-        echo 错误: 创建虚拟环境失败
-        echo 可能原因: Python 未正确安装或版本过低
+        echo ERROR: Failed to create virtual environment
+        echo Possible reason: Python not installed correctly or version too low
         goto :end
     )
 )
 
 call venv\Scripts\activate.bat
-echo 安装 Python 包（首次运行需要几分钟）...
+echo Installing Python packages (may take a few minutes)...
 pip install -q fastapi uvicorn python-multipart sqlalchemy pillow python-docx PyPDF2 PyMuPDF requests python-dotenv httpx
 if %errorlevel% neq 0 (
-    echo 错误: pip 安装失败
-    echo 可能原因: 网络问题或 pip 版本过低
+    echo ERROR: pip install failed
+    echo Possible reason: Network issue or pip version too low
     goto :end
 )
 
 if not exist "uploads" mkdir uploads
 if not exist "data" mkdir data
-echo OK - 后端依赖安装完成
+echo OK - Backend dependencies installed
 echo.
 
-echo [Step 4/4] 安装前端依赖...
+echo [Step 4/4] Install frontend dependencies...
 cd /d "%FRONTEND_DIR%"
 if not exist "node_modules" (
-    echo 安装 Node.js 包（首次运行需要几分钟）...
+    echo Installing Node.js packages (may take a few minutes)...
     npm install --silent
     if %errorlevel% neq 0 (
-        echo 错误: npm 安装失败
-        echo 可能原因: 网络问题或 npm 版本过低
+        echo ERROR: npm install failed
+        echo Possible reason: Network issue or npm version too low
         goto :end
     )
 )
-echo OK - 前端依赖安装完成
+echo OK - Frontend dependencies installed
 echo.
 
 cd /d "%PROJECT_DIR%"
 echo ====================================
-echo   启动服务
+echo   Start Services
 echo ====================================
 echo.
 
-echo [1/2] 启动后端服务（端口 8000）...
+echo [1/2] Starting backend (port 8000)...
 cd /d "%BACKEND_DIR%"
 call venv\Scripts\activate.bat
 start /b python -m uvicorn main:app --reload --host 0.0.0.0 --port 8000
 cd /d "%PROJECT_DIR%"
 timeout /t 3 /nobreak >nul
-echo 后端服务已启动
+echo Backend started
 
-echo [2/2] 启动前端服务（端口 3000）...
+echo [2/2] Starting frontend (port 3000)...
 cd /d "%FRONTEND_DIR%"
 start /b npm run dev -- --webpack
 cd /d "%PROJECT_DIR%"
 timeout /t 5 /nobreak >nul
-echo 前端服务已启动
+echo Frontend started
 
 echo.
 echo ====================================
-echo   服务运行中
+echo   Services Running
 echo ====================================
 echo.
-echo 前端地址: http://localhost:3000
-echo 后端地址: http://localhost:8000
-echo API文档:  http://localhost:8000/docs
+echo Frontend: http://localhost:3000
+echo Backend:  http://localhost:8000
+echo API Docs: http://localhost:8000/docs
 echo.
 
-echo 正在打开浏览器...
+echo Opening browser...
 timeout /t 2 /nobreak >nul
 start http://localhost:3000
-echo 浏览器已打开
+echo Browser opened
 echo.
 
 echo ====================================
-echo   使用说明
+echo   Instructions
 echo ====================================
 echo.
-echo - 服务在后台运行
-echo - 关闭此窗口可停止所有服务
-echo - 首次启动需等待编译（1-2分钟）
+echo - Services are running in background
+echo - Close this window to stop all services
+echo - First startup may take 1-2 minutes to compile
 echo.
 
 :end
-echo 按任意键退出...
+echo Press any key to exit...
 pause >nul
