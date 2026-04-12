@@ -30,7 +30,7 @@
 ## 技术栈
 
 ### 前端
-- **Next.js 16** - React 框架
+- **Next.js 15.2.4** - React 框架（使用 webpack 模式以确保兼容性）
 - **TypeScript** - 类型安全
 - **Tailwind CSS** - 样式框架
 - **Axios** - HTTP 客户端
@@ -54,68 +54,73 @@
 
 ```
 xinda/
-├── xinda-frontend/          # Next.js 前端
+├── start.sh                     # Mac/Linux 启动脚本
+├── start.bat                    # Windows 启动脚本
+├── xinda-frontend/             # Next.js 前端
 │   ├── src/
-│   │   ├── app/               # App Router 页面
-│   │   ├── components/        # React 组件
-│   │   └── lib/              # API 封装
-│   ├── package.json
-│   └── .env.local             # 前端环境变量
+│   │   ├── app/                 # App Router 页面
+│   │   ├── components/          # React 组件
+│   │   └── lib/                # API 封装
+│   └── package.json
 │
-├── xinda-backend/           # FastAPI 后端
-│   ├── models/                # 数据库模型
-│   ├── routers/               # API 路由
-│   ├── services/              # 业务服务
-│   ├── main.py                # FastAPI 入口
-│   ├── requirements.txt       # Python 依赖
-│   └── .env                   # 后端环境变量
+├── xinda-backend/               # FastAPI 后端
+│   ├── models/                  # 数据库模型
+│   ├── routers/                 # API 路由
+│   ├── services/                # 业务服务
+│   ├── main.py                  # FastAPI 入口
+│   └── requirements.txt          # Python 依赖
 │
-├── package/                   # Windows 打包脚本
-├── uploads/                   # 上传文件存储
-├── data/                      # 数据库文件
-└── README.md                  # 项目文档
+├── package/                     # Windows 打包脚本
+├── uploads/                     # 上传文件存储
+├── data/                        # 数据库文件
+└── README.md                     # 项目文档
 ```
 
 ## 安装步骤
 
 ### 前置要求
 
-- Node.js 18+
-- Python 3.9+
+- **Node.js 22 LTS** - [下载](https://nodejs.org/)
+- **Python 3.13** - [下载](https://www.python.org/downloads/)
+- 安装 Python 时请务必勾选 **"Add Python to PATH"** 选项
 
-### 1. 安装前端依赖
+### 快速启动（推荐）
 
+#### Windows
 ```bash
-cd xinda-frontend
-npm install
+# 双击运行
+start.bat
 ```
 
-### 2. 安装后端依赖
-
+#### Mac/Linux
 ```bash
-cd ../xinda-backend
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-pip install -r requirements.txt
-```
-
-### 3. 启动服务
-
-```bash
-# 使用启动脚本（同时启动前后端）
+# 终端运行
+chmod +x start.sh
 ./start.sh
 ```
 
-或手动启动：
+脚本会自动：
+1. 检测 Node.js 和 Python 是否已安装
+2. 创建 Python 虚拟环境并安装后端依赖
+3. 安装前端依赖（确保使用 Next.js 15.2.4）
+4. 启动后端（端口 8000）和前端（端口 3000）
+5. 自动打开浏览器访问 http://localhost:3000
+
+### 手动启动（备选）
+
+如果启动脚本遇到问题，可以手动启动：
 
 ```bash
 # 后端
 cd xinda-backend
-source venv/bin/activate
+python -m venv venv
+venv\Scripts\activate  # Windows: venv\Scripts\activate.bat
+pip install -r requirements.txt
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
 
 # 前端（新终端）
 cd xinda-frontend
+npm install
 npm run dev
 ```
 
