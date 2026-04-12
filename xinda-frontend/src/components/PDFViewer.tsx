@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Document, Page, pdfjs } from 'react-pdf';
+import { Document, Page } from 'react-pdf';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 
@@ -12,15 +12,7 @@ interface PDFViewerProps {
   scale?: number;
 }
 
-// Use local worker file
-function usePDFWorker() {
-  useEffect(() => {
-    pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
-  }, []);
-}
-
 export default function PDFViewer({ fileUrl, currentPage, onPageChange, scale = 1.0 }: PDFViewerProps) {
-  usePDFWorker();
   const [numPages, setNumPages] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -29,6 +21,16 @@ export default function PDFViewer({ fileUrl, currentPage, onPageChange, scale = 
   const [isPanning, setIsPanning] = useState(false);
   const panStart = useRef({ x: 0, y: 0 });
   const lastPan = useRef({ x: 0, y: 0 });
+  const workerSet = useRef(false);
+
+  useEffect(() => {
+    if (!workerSet.current && typeof window !== 'undefined') {
+      import('pdfjs-dist').then((pdfjs) => {
+        pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
+        workerSet.current = true;
+      }).catch(console.error);
+    }
+  }, []);
 
   function onDocumentLoadSuccess({ numPages: pages }: { numPages: number }) {
     setNumPages(pages);
