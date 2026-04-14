@@ -163,22 +163,9 @@ async def update_language_detection_prompt(db: Session):
         return
     
     language_codes = [p.language_code for p in prompts]
-    language_list = ", ".join([f'- "{p.language_code}" 表示{p.language_name}' for p in prompts])
+    detection_prompt = f'仅输出语言代码：{chr(32).join(language_codes)}'
     
-    detection_prompt = f"""# Role
-你是一名语言识别专家。
-
-# Task
-识别图片中文字的主要语言。
-
-# Output Format
-仅输出以下语言代码之一，不要输出任何其他内容或解释：
-{language_list}
-
-# Output
-直接输出语言代码，无任何附加内容。"""
-    
-    config = db.query(AppConfig).filter(AppConfig.key == "language_detection_prompt").first()
+    config = db.query(AppConfig).filter(AppConfig.key == 'language_detection_prompt').first()
     if config:
         config.value = detection_prompt
     else:

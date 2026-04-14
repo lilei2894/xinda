@@ -109,48 +109,63 @@ class OCRService:
         img_base64 = base64.b64encode(buffered.getvalue()).decode()
         return img_base64
     
-    def detect_language(self, image_base64):
+def detect_language(self, image_base64):
+        print('[DETECT-LANG] Starting...')
         from models.database import SessionLocal
         db = SessionLocal()
         try:
             language_detection_prompt = prompts_module.get_language_detection_prompt(db)
+            print(f'[DETECT-LANG] Got prompt, length: {len(language_detection_prompt)}')
         finally:
             db.close()
         
         base = self.api_endpoint.rstrip('/')
-        url = f"{base}/chat/completions" if base.endswith('/v1') else f"{base}/v1/chat/completions"
-        response = requests.post(
-            url,
-            headers=self._get_headers(),
-            json={
-                "model": self.model,
-                "messages": [
-                    {
-                        "role": "user",
-                        "content": [
-                            {"type": "text", "text": language_detection_prompt},
-                            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_base64}"}}
-                        ]
-                    }
-                ],
-                "max_tokens": 10,
-                "temperature": 0.1,
-            },
-            timeout=60
-        )
-        response.raise_for_status()
-        result = response.json()
-        detected = result["choices"][0]["message"]["content"].strip().lower().strip('"').strip("'")
+        url = f'{base}/chat/completions' if base.endswith('/v1') else f'{base}/v1/chat/completions'
+        print(f'[DETECT-LANG] URL: {url}')
+        print(f'[DETECT-LANG] Model: {self.model}')
+        
+        try:
+            response = requests.post(
+                url,
+                headers=self._get_headers(),
+                json={
+                    'model': self.model,
+                    'messages': [
+                        {
+                            'role': 'user',
+                            'content': [
+                                {'type': 'text', 'text': language_detection_prompt},
+                                {'type': 'image_url', 'image_url': {'url': f'data:image/jpeg;base64,{image_base64}'}}
+                            ]
+                        }
+                    ],
+                    'max_tokens': 10,
+                    'temperature': 0.1,
+                },
+                timeout=60
+            )
+            print(f'[DETECT-LANG] Response status: {response.status_code}')
+            response.raise_for_status()
+            result = response.json()
+            print(f'[DETECT-LANG] Response: {result}')
+            detected = result['choices'][0]['message']['content'].strip().lower().strip('\"').strip('\")
+            print(f'[DETECT-LANG] Raw detected: {detected}')
+        except Exception as e:
+            print(f'[DETECT-LANG] API error: {e}')
+            return 'en'
+        
         from models.database import LanguagePrompt
         db = SessionLocal()
         try:
             valid_codes = [l.language_code for l in db.query(LanguagePrompt).all()]
+            print(f'[DETECT-LANG] Valid codes: {valid_codes}')
         finally:
             db.close()
-        # Fallback to detected code if not in valid list
+        
         if detected not in valid_codes:
-            print(f"[LANGUAGE DETECT] Invalid code '{detected}', using 'en' as fallback")
-            detected = "en"
+            print(f'[DETECT-LANG] Invalid code {detected}, fallback to en')
+            detected = 'en'
+        print(f'[DETECT-LANG] Final: {detected}')
         return detected
     
     def call_vision_model(self, image_base64):
