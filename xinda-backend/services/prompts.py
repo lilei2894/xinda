@@ -49,5 +49,5 @@ def get_language_detection_prompt(db=None) -> str:
             return config.value
     
     return """Please identify the primary language of the text in this image.
-Respond with ONLY one of the following: "ja" for Japanese, "en" for English.
+Respond with ONLY one of the following language codes: "jp" for Japanese, "en" for English, "de" for German, "fr" for French.
 Do not include any other text or explanation."""

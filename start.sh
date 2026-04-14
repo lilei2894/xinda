@@ -5,6 +5,10 @@
 # 支持 Windows (PowerShell) 和 macOS/Linux
 # ================================================
 
+# 默认端口配置（可通过环境变量覆盖）
+BACKEND_PORT=${BACKEND_PORT:-8000}
+FRONTEND_PORT=${FRONTEND_PORT:-3000}
+
 detect_os() {
     case "$(uname -s)" in
         Linux*)     echo "linux";;
@@ -242,8 +246,9 @@ start_backend() {
     mkdir -p uploads data
     
     # 启动后端
-    echo "   启动FastAPI服务在端口8000..."
-    $PY -m uvicorn main:app --reload --host 0.0.0.0 --port 8000 &
+    echo "   启动FastAPI服务在端口${BACKEND_PORT}..."
+    export BACKEND_PORT
+    $PY -m uvicorn main:app --reload --host 0.0.0.0 --port ${BACKEND_PORT} &
     BACKEND_PID=$!
     cd ..
     echo "✅ 后端服务已启动 (PID: $BACKEND_PID)"
@@ -268,8 +273,9 @@ start_frontend() {
     fi
     
     # 启动前端
-    echo "   启动Next.js服务在端口3000..."
-    npm run dev &
+    echo "   启动Next.js服务在端口${FRONTEND_PORT}..."
+    export NEXT_PUBLIC_API_URL="http://localhost:${BACKEND_PORT}/api"
+    PORT=${FRONTEND_PORT} npm run dev &
     FRONTEND_PID=$!
     cd ..
     echo "✅ 前端服务已启动 (PID: $FRONTEND_PID)"
@@ -281,8 +287,8 @@ echo "🔍 检测操作系统: $OS"
 
 echo ""
 echo "🔍 检查端口..."
-kill_port 8000
-kill_port 3000
+kill_port ${BACKEND_PORT}
+kill_port ${FRONTEND_PORT}
 
 echo ""
 echo "🚀 启动服务..."
@@ -294,14 +300,14 @@ echo "=========================================="
 echo "  启动完成！"
 echo "=========================================="
 echo ""
-echo "🌐 前端地址: http://localhost:3000"
-echo "🔧 后端地址: http://localhost:8000"
-echo "📚 API文档:  http://localhost:8000/docs"
+echo "🌐 前端地址: http://localhost:${FRONTEND_PORT}"
+echo "🔧 后端地址: http://localhost:${BACKEND_PORT}"
+echo "📚 API文档:  http://localhost:${BACKEND_PORT}/docs"
 echo ""
 
 # 自动打开浏览器
 open_browser() {
-    local url="http://localhost:3000"
+    local url="http://localhost:${FRONTEND_PORT}"
     echo "🚀 正在打开浏览器..."
     sleep 3  # 等待服务启动
     

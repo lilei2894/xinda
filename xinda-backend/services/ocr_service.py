@@ -17,7 +17,7 @@ class OCRService:
     def __init__(self, model=None, endpoint=None, language=None, api_key=None):
         self.api_endpoint = endpoint or os.getenv("OLLAMA_ENDPOINT", "http://172.25.249.20:30000")
         self.model = model or os.getenv("OLLAMA_MODEL", "qwen3.5-uncensored-35B")
-        self.language = language or "ja"
+        self.language = language or "jp"
         self.api_key = api_key
         self.max_ocr_retries = int(os.getenv("OCR_MAX_RETRIES", "2"))
     
@@ -147,7 +147,11 @@ class OCRService:
             valid_codes = [l.language_code for l in db.query(LanguagePrompt).all()]
         finally:
             db.close()
-        return detected if detected in valid_codes else "ja"
+        # Fallback to detected code if not in valid list
+        if detected not in valid_codes:
+            print(f"[LANGUAGE DETECT] Invalid code '{detected}', using 'en' as fallback")
+            detected = "en"
+        return detected
     
     def call_vision_model(self, image_base64):
         from models.database import SessionLocal
@@ -225,3 +229,56 @@ class OCRService:
                 all_text.append(f"=== Page {idx + 1} ===\nError: {str(e)}")
         
         return "\n\n".join(all_text)
+    
+    def call_vision_model_stream(self, image_base64, callback):
+        from models.database import SessionLocal
+        db = SessionLocal()
+        try:
+            prompt = prompts_module.get_ocr_prompt(self.language, db)
+        finally:
+            db.close()
+        
+        base = self.api_endpoint.rstrip('/')
+        url = f"{base}/chat/completions" if base.endswith('/v1') else f"{base}/v1/chat/completions"
+        payload = {
+            "model": self.model,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": prompt},
+                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_base64}"}}
+                    ]
+                }
+            ],
+            "max_tokens": 4000,
+            "stream": True
+        }
+        
+        try:
+            response = requests.post(url, headers=self._get_headers(), json=payload, stream=True, timeout=300)
+            response.raise_for_status()
+            
+            full_text = ""
+            for line in response.iter_lines():
+                if not line:
+                    continue
+                line_text = line.decode('utf-8')
+                if line_text.startswith('data: '):
+                    data_str = line_text[6:]
+                    if data_str == '[DONE]':
+                        break
+                    try:
+                        chunk = json.loads(data_str)
+                        if 'choices' in chunk and len(chunk['choices']) > 0:
+                            delta = chunk['choices'][0].get('delta', {})
+                            content = delta.get('content', '')
+                            if content:
+                                full_text += content
+                                callback(content, full_text)
+                    except json.JSONDecodeError:
+                        continue
+            
+            return full_text
+        except Exception as e:
+            raise Exception(f"Stream API call failed: {str(e)}")

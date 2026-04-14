@@ -6,16 +6,18 @@ import os
 import uuid
 import threading
 import time
+import sys
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
 from models.database import get_db, ProcessingHistory, Provider
 from services.ocr_service import OCRService
 from services.translate_service import TranslateService
+from services.stream_store import set_stream_data, append_stream_text, get_stream_page_text, clear_stream_data, set_stream_status
 
 router = APIRouter()
 
 UPLOAD_DIR = os.getenv("UPLOAD_DIR", "./uploads")
-MAX_FILE_SIZE = int(os.getenv("MAX_FILE_SIZE", "20971520"))
+MAX_FILE_SIZE = int(os.getenv("MAX_FILE_SIZE", "52428800"))
 
 upload_executor = ThreadPoolExecutor(max_workers=2)
 
@@ -24,7 +26,7 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 ALLOWED_TYPES = ["application/pdf", "image/jpeg", "image/jpg"]
 
 
-def process_file_background(record_id: str, file_path: str, file_type: str, ocr_model: str, translate_model: str, endpoint: str, language: str = "ja", ocr_api_key: str = None, translate_api_key: str = None):
+def process_file_background(record_id: str, file_path: str, file_type: str, ocr_model: str, translate_model: str, endpoint: str, language: str = "jp", ocr_api_key: str = None, translate_api_key: str = None):
     import fitz
     from PIL import Image
     from io import BytesIO
@@ -36,6 +38,8 @@ def process_file_background(record_id: str, file_path: str, file_type: str, ocr_
         if not record:
             return
         
+        clear_stream_data(record_id)
+        set_stream_status(record_id, "processing")
         record.status = "processing"
         
         if language == "auto":
@@ -51,11 +55,14 @@ def process_file_background(record_id: str, file_path: str, file_type: str, ocr_
                     img = Image.open(file_path)
                 img_base64 = ocr_service_temp.image_to_base64(img)
                 detected = ocr_service_temp.detect_language(img_base64)
+                print(f"[LANGUAGE DETECT] Detected: {detected}")
                 language = detected
                 record.model_endpoint = detected
+                record.doc_language = detected
                 db.commit()
-            except Exception:
-                language = "ja"
+            except Exception as e:
+                print(f"[LANGUAGE DETECT ERROR] {e}")
+                language = "auto"
         
         db.commit()
         
@@ -72,6 +79,7 @@ def process_file_background(record_id: str, file_path: str, file_type: str, ocr_
         
         ocr_done = {}
         trans_done = {}
+        ocr_page_complete = {}
         lock = threading.Lock()
         
         def ocr_worker():
@@ -84,12 +92,7 @@ def process_file_background(record_id: str, file_path: str, file_type: str, ocr_
                         local_db = SessionLocal()
                         try:
                             local_record = local_db.query(ProcessingHistory).filter(ProcessingHistory.id == record_id).first()
-                            if local_record and local_record.ocr_paused == "true":
-                                local_record.ocr_last_page = str(page_num - 1)
-                                local_db.commit()
-                                break
                             
-                            # 重新读取最新的模型设置
                             current_ocr_model_full = local_record.ocr_model_id if local_record else None
                             current_ocr_model = ocr_model
                             current_ocr_api_key = ocr_api_key
@@ -117,61 +120,66 @@ def process_file_background(record_id: str, file_path: str, file_type: str, ocr_
                             page_obj = doc[page_num - 1]
                             pix = page_obj.get_pixmap()
                             img = Image.open(BytesIO(pix.tobytes("png")))
+                            
                             img_base64 = current_ocr_service.image_to_base64(img)
-                            text = current_ocr_service.call_vision_model(img_base64)
+                            
+                            def ocr_callback(chunk, full_text):
+                                append_stream_text(record_id, 'ocr', chunk, page_num)
+                            
+                            text = current_ocr_service.call_vision_model_stream(img_base64, ocr_callback)
                             with lock:
                                 ocr_done[page_num] = text
+                                ocr_page_complete[page_num] = True
                         except Exception as e:
                             with lock:
                                 ocr_done[page_num] = f"Error: {str(e)}"
+                                ocr_page_complete[page_num] = True
                     doc.close()
                 else:
                     img = Image.open(file_path)
                     img_base64 = ocr_service.image_to_base64(img)
-                    text = ocr_service.call_vision_model(img_base64)
+                    
+                    def ocr_callback(chunk, full_text):
+                        append_stream_text(record_id, 'ocr', chunk, 1)
+                    
+                    text = ocr_service.call_vision_model_stream(img_base64, ocr_callback)
                     with lock:
                         ocr_done[1] = text
+                        ocr_page_complete[1] = True
             except Exception as e:
                 for idx in range(1, total_pages + 1):
                     with lock:
                         if idx not in ocr_done:
                             ocr_done[idx] = f"Error: {str(e)}"
+                            ocr_page_complete[idx] = True
         
         def translate_worker():
             while True:
-                local_db = SessionLocal()
-                try:
-                    local_record = local_db.query(ProcessingHistory).filter(ProcessingHistory.id == record_id).first()
-                    trans_paused = local_record and local_record.trans_paused == "true"
-                finally:
-                    local_db.close()
-                
-                if trans_paused:
-                    time.sleep(1)
-                    continue
-                
                 with lock:
-                    pages_to_translate = [p for p in range(1, total_pages + 1) if p in ocr_done and p not in trans_done]
-                    ocr_complete = len(ocr_done) >= total_pages
+                    pending_pages = []
+                    for p in range(1, total_pages + 1):
+                        if p not in trans_done and ocr_page_complete.get(p, False):
+                            ocr_content = ocr_done.get(p, '')
+                            if ocr_content and not ocr_content.strip().startswith('Error:') and ocr_content.strip():
+                                pending_pages.append(p)
+                    
+                    ocr_complete = all(ocr_page_complete.get(p, False) for p in range(1, total_pages + 1))
                 
-                if not pages_to_translate and ocr_complete:
+                if not pending_pages and ocr_complete:
                     break
                 
-                if not pages_to_translate:
+                if not pending_pages:
                     time.sleep(1)
                     continue
                 
-                for page_num in pages_to_translate:
+                for page_num in pending_pages:
                     with lock:
                         page_content = ocr_done.get(page_num, '')
                     
                     local_db = SessionLocal()
                     try:
                         local_record = local_db.query(ProcessingHistory).filter(ProcessingHistory.id == record_id).first()
-                        if local_record and local_record.trans_paused == "true":
-                            break
                         
-                        # 重新读取最新的模型设置
                         current_trans_model_full = local_record.translate_model_id if local_record else None
                         current_trans_model = translate_model
                         current_trans_api_key = translate_api_key
@@ -197,7 +205,12 @@ def process_file_background(record_id: str, file_path: str, file_type: str, ocr_
                     
                     if page_content.strip() and not page_content.strip().startswith('Error:'):
                         try:
-                            translated = current_trans_service.translate_to_chinese(page_content)
+                            def trans_callback(chunk, full_text):
+                                append_stream_text(record_id, 'trans', chunk, page_num)
+                                with lock:
+                                    trans_done[page_num] = full_text
+                            
+                            translated = current_trans_service.translate_to_chinese_stream(page_content, trans_callback)
                         except Exception as e:
                             translated = f"Error: {str(e)}"
                     else:
@@ -206,26 +219,44 @@ def process_file_background(record_id: str, file_path: str, file_type: str, ocr_
                     with lock:
                         trans_done[page_num] = translated
                     
-                    if page_num % 3 == 0 or page_num == total_pages:
-                        with lock:
-                            new_trans_full = []
-                            for p in range(1, total_pages + 1):
-                                content = trans_done.get(p, '')
-                                new_trans_full.append(f"=== Page {p} ===\n{content}")
-                            record.translated_text = "\n\n".join(new_trans_full)
-                        db.commit()
-                
-                time.sleep(1)
+                    with lock:
+                        new_trans_full = []
+                        for p in range(1, total_pages + 1):
+                            content = trans_done.get(p, '')
+                            new_trans_full.append(f"=== Page {p} ===\n{content}")
+                        record.translated_text = "\n\n".join(new_trans_full)
+                    db.commit()
+                    
+                    time.sleep(0.5)
         
         ocr_thread = threading.Thread(target=ocr_worker)
         trans_thread = threading.Thread(target=translate_worker)
+        
+        title_generated = False
+        title_generate_threshold = 3 if total_pages > 3 else total_pages
+        
+        def try_generate_title():
+            nonlocal title_generated
+            if title_generated or record.content_title:
+                return
+            
+            try:
+                current_ocr_text = record.ocr_text or ""
+                title = translate_service.generate_title(current_ocr_text, use_translated=False)
+                if not title:
+                    title = translate_service.generate_title_from_ocr_fallback(current_ocr_text)
+                if title:
+                    record.content_title = title
+                    db.commit()
+                    title_generated = True
+            except Exception:
+                pass
         
         ocr_thread.start()
         trans_thread.start()
         
         while ocr_thread.is_alive():
-            time.sleep(2)  # Reduce commit frequency
-            # Only update periodically, not every 0.5s
+            time.sleep(2)
             with lock:
                 new_ocr_full = []
                 for p in range(1, total_pages + 1):
@@ -233,6 +264,10 @@ def process_file_background(record_id: str, file_path: str, file_type: str, ocr_
                     new_ocr_full.append(f"=== Page {p} ===\n{content}")
                 record.ocr_text = "\n\n".join(new_ocr_full)
             db.commit()
+            
+            completed_ocr = len([p for p in ocr_done if ocr_done.get(p, '').strip() and not ocr_done.get(p, '').strip().startswith('Error:')])
+            if completed_ocr >= title_generate_threshold and not title_generated:
+                try_generate_title()
         
         ocr_thread.join()
         trans_thread.join()
@@ -245,6 +280,18 @@ def process_file_background(record_id: str, file_path: str, file_type: str, ocr_
             record.ocr_text = "\n\n".join(new_ocr_full)
             db.commit()
         
+        if not title_generated and not record.content_title:
+            try:
+                current_ocr_text = record.ocr_text or ""
+                title = translate_service.generate_title(current_ocr_text, use_translated=False)
+                if not title:
+                    title = translate_service.generate_title_from_ocr_fallback(current_ocr_text)
+                if title:
+                    record.content_title = title
+                    db.commit()
+            except Exception:
+                pass
+        
         with lock:
             new_trans_full = []
             for p in range(1, total_pages + 1):
@@ -254,20 +301,13 @@ def process_file_background(record_id: str, file_path: str, file_type: str, ocr_
             record.translated_text = full_translated_text
             db.commit()
         
-        try:
-            title = translate_service.generate_title(full_translated_text)
-            if title:
-                record.content_title = title
-                db.commit()
-        except Exception:
-            pass
-        
         # Check if all pages are complete before marking as completed
         ocr_pages_count = len([p for p in range(1, total_pages + 1) if ocr_done.get(p, '').strip() and not ocr_done.get(p, '').strip().startswith('Error:')])
         trans_pages_count = len([p for p in range(1, total_pages + 1) if trans_done.get(p, '').strip() and not trans_done.get(p, '').strip().startswith('Error:')])
         
         if ocr_pages_count >= total_pages and trans_pages_count >= total_pages:
             record.status = "completed"
+            set_stream_status(record_id, "completed")
         else:
             record.status = "processing"
         db.commit()
@@ -275,6 +315,7 @@ def process_file_background(record_id: str, file_path: str, file_type: str, ocr_
         record = db.query(ProcessingHistory).filter(ProcessingHistory.id == record_id).first()
         if record:
             record.status = "failed"
+            set_stream_status(record_id, "failed")
             db.commit()
     finally:
         db.close()

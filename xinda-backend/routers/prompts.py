@@ -16,6 +16,7 @@ class LanguagePromptUpdate(BaseModel):
     language_name: Optional[str] = None
     ocr_prompt: Optional[str] = None
     translate_prompt: Optional[str] = None
+    color: Optional[str] = None
 
 class LanguagePromptResponse(BaseModel):
     id: int
@@ -23,6 +24,7 @@ class LanguagePromptResponse(BaseModel):
     language_name: str
     ocr_prompt: Optional[str]
     translate_prompt: Optional[str]
+    color: Optional[str]
     
     class Config:
         from_attributes = True
@@ -64,6 +66,8 @@ async def update_language_prompt(language_code: str, data: LanguagePromptUpdate,
         prompt.ocr_prompt = data.ocr_prompt
     if data.translate_prompt is not None:
         prompt.translate_prompt = data.translate_prompt
+    if data.color is not None:
+        prompt.color = data.color
     
     db.commit()
     db.refresh(prompt)

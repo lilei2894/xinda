@@ -2,8 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import dynamic from 'next/dynamic';
-import { getResult, reprocessOcr, reprocessTranslate, getProviders, updateContentTitle, updateRecordModel, pauseOcr, resumeOcr, pauseTranslate, resumeTranslate, autoGenerateTitle, continueProcessing } from '@/lib/api';
+import { getResult, reprocessOcr, reprocessTranslate, getProviders, updateContentTitle, updateRecordModel, updateRecordLanguage, autoGenerateTitle, continueProcessing, createStreamConnection, API_BASE } from '@/lib/api';
 import type { Provider } from '@/lib/providers';
 import { flattenModelsForType, getLanguages, type LanguagePrompt } from '@/lib/providers';
 import ModelSettingsModal from '@/components/ModelSettingsModal';
@@ -12,10 +11,7 @@ import ReprocessModal from '@/components/ReprocessModal';
 import ExportModal from '@/components/ExportModal';
 import CustomDropdown from '@/components/CustomDropdown';
 import ResizablePanels from '@/components/ResizablePanels';
-
-const PDFViewer = dynamic(() => import('@/components/PDFViewer'), { ssr: false });
-
-const SCALE_STEP = 0.25;
+import ImageViewer from '@/components/ImageViewer';
 
 interface PageBlock {
   pageNum: number;
@@ -52,29 +48,26 @@ export default function ResultPage() {
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [scale, setScale] = useState(0);
-  const [position, setPosition] = useState({ x: 0, y: 0 });
-  const [isDragging, setIsDragging] = useState(false);
   const [isReprocessingOcr, setIsReprocessingOcr] = useState(false);
   const [isReprocessingTrans, setIsReprocessingTrans] = useState(false);
-  const [isOcrPaused, setIsOcrPaused] = useState(false);
-  const [isTransPaused, setIsTransPaused] = useState(false);
   const [showReprocessModal, setShowReprocessModal] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
   const [showModelModal, setShowModelModal] = useState(false);
   const [showPromptModal, setShowPromptModal] = useState(false);
+  const [showContinueConfirm, setShowContinueConfirm] = useState(false);
   const [providers, setProviders] = useState<Provider[]>([]);
   const [languages, setLanguages] = useState<LanguagePrompt[]>([]);
   const [docLanguage, setDocLanguage] = useState<string>('auto');
+  const [savingLanguage, setSavingLanguage] = useState(false);
   const [selectedOcrModel, setSelectedOcrModel] = useState<string>('');
   const [selectedTransModel, setSelectedTransModel] = useState<string>('');
-  const [detectedLanguage, setDetectedLanguage] = useState<string>('ja');
+  const [detectedLanguage, setDetectedLanguage] = useState<string>('jp');
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleInput, setTitleInput] = useState('');
   const [pageInput, setPageInput] = useState<string>('');
   const [isEditingPage, setIsEditingPage] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-  const lastPos = useRef({ x: 0, y: 0 });
+  const imageViewerRef = useRef<{ reset: () => void; zoomIn: () => void; zoomOut: () => void } | null>(null);
   const ocrScrollRef = useRef<HTMLDivElement>(null);
   const transScrollRef = useRef<HTMLDivElement>(null);
   const reprocessingOcrPageRef = useRef<number | null>(null);
@@ -83,6 +76,7 @@ export default function ResultPage() {
   const prevTransContentRef = useRef<string>('');
   const stuckProgressRef = useRef<{ocr: number; trans: number; count: number}>({ocr: 0, trans: 0, count: 0});
   const hasCalledContinueRef = useRef<boolean>(false);
+  const hasCheckedCompletionRef = useRef<boolean>(false);
   const fetchingRef = useRef<boolean>(false);
   const isMountedRef = useRef<boolean>(true);
 
@@ -100,25 +94,9 @@ export default function ResultPage() {
       const dataTransComplete = getCompletedPages(data.translated_text);
       const dataIsComplete = dataOcrComplete >= dataTotalPages && dataTransComplete >= dataTotalPages && dataTotalPages > 0;
       
-      if (!dataIsComplete && data.ocr_text && dataOcrComplete > 0 && !hasCalledContinueRef.current) {
-        const ocrModel = data.ocr_model_id || selectedOcrModel;
-        const transModel = data.translate_model_id || selectedTransModel;
-        const provider = providers.find(p => p.id.toString() === ocrModel?.split('/')[0]);
-        const endpoint = provider?.base_url || '';
-        const lang = data.doc_language || docLanguage;
-        
-        hasCalledContinueRef.current = true;
-        try {
-          await continueProcessing(
-            id,
-            ocrModel,
-            transModel,
-            endpoint,
-            lang === 'auto' ? detectedLanguage : lang
-          );
-        } catch (err) {
-          hasCalledContinueRef.current = false;
-        }
+      if (!dataIsComplete && data.ocr_text && dataOcrComplete > 0 && !hasCheckedCompletionRef.current) {
+        hasCheckedCompletionRef.current = true;
+        setShowContinueConfirm(true);
       }
       
       if (data.total_pages) {
@@ -155,37 +133,6 @@ export default function ResultPage() {
   }, [id, selectedOcrModel, selectedTransModel, docLanguage, detectedLanguage]);
 
   useEffect(() => {
-    const handleGlobalMouseMove = (e: MouseEvent) => {
-      if (isDragging && scale > 0) {
-        setPosition(prev => {
-          const newPos = {
-            x: lastPos.current.x + e.movementX,
-            y: lastPos.current.y + e.movementY
-          };
-          lastPos.current = newPos;
-          return newPos;
-        });
-      }
-    };
-
-    const handleGlobalMouseUp = () => {
-      if (isDragging) {
-        setIsDragging(false);
-      }
-    };
-
-    if (isDragging && scale > 0) {
-      window.addEventListener('mousemove', handleGlobalMouseMove);
-      window.addEventListener('mouseup', handleGlobalMouseUp);
-    }
-
-    return () => {
-      window.removeEventListener('mousemove', handleGlobalMouseMove);
-      window.removeEventListener('mouseup', handleGlobalMouseUp);
-    };
-  }, [isDragging, scale]);
-
-  useEffect(() => {
     isMountedRef.current = true;
     fetchResult();
     const interval = setInterval(fetchResult, 10000);
@@ -194,6 +141,79 @@ export default function ResultPage() {
       isMountedRef.current = false;
     };
   }, [fetchResult]);
+
+  useEffect(() => {
+    if (!result || result.status !== 'processing') return;
+    
+    const eventSource = createStreamConnection(id);
+    
+    eventSource.onmessage = (event) => {
+      if (!isMountedRef.current) return;
+      try {
+        const data = JSON.parse(event.data);
+        
+        let newOcrText = result.ocr_text || '';
+        let newTranslatedText = result.translated_text || '';
+        
+        Object.keys(data).forEach(key => {
+          if (key.startsWith('ocr_page_')) {
+            const pageNum = parseInt(key.replace('ocr_page_', ''), 10);
+            const pageContent = data[key];
+            const pageRegex = new RegExp(`=== Page ${pageNum} ===\\n[^]*?(?=\\n\\n=== Page \\d+ ===|$)`);
+            if (pageRegex.test(newOcrText)) {
+              newOcrText = newOcrText.replace(pageRegex, `=== Page ${pageNum} ===\n${pageContent}`);
+            } else {
+              const pageHeader = `=== Page ${pageNum} ===\n${pageContent}`;
+              if (newOcrText) {
+                newOcrText = newOcrText + '\n\n' + pageHeader;
+              } else {
+                newOcrText = pageHeader;
+              }
+            }
+          }
+          
+          if (key.startsWith('trans_page_')) {
+            const pageNum = parseInt(key.replace('trans_page_', ''), 10);
+            const pageContent = data[key];
+            const pageRegex = new RegExp(`=== Page ${pageNum} ===\\n[^]*?(?=\\n\\n=== Page \\d+ ===|$)`);
+            if (pageRegex.test(newTranslatedText)) {
+              newTranslatedText = newTranslatedText.replace(pageRegex, `=== Page ${pageNum} ===\n${pageContent}`);
+            } else {
+              const pageHeader = `=== Page ${pageNum} ===\n${pageContent}`;
+              if (newTranslatedText) {
+                newTranslatedText = newTranslatedText + '\n\n' + pageHeader;
+              } else {
+                newTranslatedText = pageHeader;
+              }
+            }
+          }
+        });
+        
+        if (newOcrText !== result.ocr_text || newTranslatedText !== result.translated_text) {
+          setResult((prev: any) => ({
+            ...prev,
+            ocr_text: newOcrText,
+            translated_text: newTranslatedText,
+          }));
+        }
+        
+        if (data.status === 'completed' || data.status === 'failed') {
+          eventSource.close();
+          fetchResult();
+        }
+      } catch (e) {
+        console.error('Stream parse error:', e);
+      }
+    };
+    
+    eventSource.onerror = () => {
+      eventSource.close();
+    };
+    
+    return () => {
+      eventSource.close();
+    };
+  }, [id, result?.status]);
 
   useEffect(() => {
     getProviders().then(data => {
@@ -267,20 +287,6 @@ export default function ResultPage() {
     scrollToPage(currentPage);
   }, [currentPage]);
 
-  // Listen for PDF wheel zoom events from PDFViewer component
-  useEffect(() => {
-    const handleScaleChange = (e: CustomEvent) => {
-      if (e.detail?.scale !== undefined) {
-        setScale(e.detail.scale);
-      }
-    };
-
-    window.addEventListener('pdf-scale-change', handleScaleChange as EventListener);
-    return () => {
-      window.removeEventListener('pdf-scale-change', handleScaleChange as EventListener);
-    };
-  }, []);
-
   const handleJumpToPage = (page: number) => {
     setCurrentPage(page);
   };
@@ -304,12 +310,60 @@ export default function ResultPage() {
     setIsReprocessingOcr(true);
     reprocessingOcrPageRef.current = page;
     prevOcrContentRef.current = getOcrContentForPage(page);
+    
+    const eventSource = createStreamConnection(id);
+    
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        
+        if (data[`ocr_page_${page}`]) {
+          setResult((prev: any) => {
+            const pageContent = data[`ocr_page_${page}`];
+            const pageRegex = new RegExp(`=== Page ${page} ===\\n[^]*?(?=\\n\\n=== Page \\d+ ===|$)`);
+            let newOcrText = prev.ocr_text || '';
+            if (pageRegex.test(newOcrText)) {
+              newOcrText = newOcrText.replace(pageRegex, `=== Page ${page} ===\n${pageContent}`);
+            }
+            return { ...prev, ocr_text: newOcrText };
+          });
+        }
+        
+        if (data[`trans_page_${page}`]) {
+          setResult((prev: any) => {
+            const pageContent = data[`trans_page_${page}`];
+            const pageRegex = new RegExp(`=== Page ${page} ===\\n[^]*?(?=\\n\\n=== Page \\d+ ===|$)`);
+            let newTransText = prev.translated_text || '';
+            if (pageRegex.test(newTransText)) {
+              newTransText = newTransText.replace(pageRegex, `=== Page ${page} ===\n${pageContent}`);
+            }
+            return { ...prev, translated_text: newTransText };
+          });
+        }
+        
+        if (data.status === 'completed') {
+          eventSource.close();
+          setIsReprocessingOcr(false);
+          reprocessingOcrPageRef.current = null;
+          fetchResult();
+        }
+      } catch (e) {
+        console.error('Stream parse error:', e);
+      }
+    };
+    
+    eventSource.onerror = () => {
+      eventSource.close();
+      setIsReprocessingOcr(false);
+      reprocessingOcrPageRef.current = null;
+    };
+    
     try {
       const actualLanguage = docLanguage === 'auto' ? detectedLanguage : docLanguage;
       await reprocessOcr(id, page, selectedOcrModel, getEndpointFromModel(selectedOcrModel), actualLanguage);
-      await fetchResult();
     } catch (err) {
       console.error('Reprocess OCR failed:', err);
+      eventSource.close();
       setIsReprocessingOcr(false);
       reprocessingOcrPageRef.current = null;
     }
@@ -320,11 +374,47 @@ export default function ResultPage() {
     setIsReprocessingTrans(true);
     reprocessingTransPageRef.current = page;
     prevTransContentRef.current = getTransContentForPage(page);
+    
+    const eventSource = createStreamConnection(id);
+    
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        
+        if (data[`trans_page_${page}`]) {
+          setResult((prev: any) => {
+            const pageContent = data[`trans_page_${page}`];
+            const pageRegex = new RegExp(`=== Page ${page} ===\\n[^]*?(?=\\n\\n=== Page \\d+ ===|$)`);
+            let newTransText = prev.translated_text || '';
+            if (pageRegex.test(newTransText)) {
+              newTransText = newTransText.replace(pageRegex, `=== Page ${page} ===\n${pageContent}`);
+            }
+            return { ...prev, translated_text: newTransText };
+          });
+        }
+        
+        if (data.status === 'completed') {
+          eventSource.close();
+          setIsReprocessingTrans(false);
+          reprocessingTransPageRef.current = null;
+          fetchResult();
+        }
+      } catch (e) {
+        console.error('Stream parse error:', e);
+      }
+    };
+    
+    eventSource.onerror = () => {
+      eventSource.close();
+      setIsReprocessingTrans(false);
+      reprocessingTransPageRef.current = null;
+    };
+    
     try {
       await reprocessTranslate(id, page, selectedTransModel, getEndpointFromModel(selectedTransModel));
-      await fetchResult();
     } catch (err) {
       console.error('Reprocess translate failed:', err);
+      eventSource.close();
       setIsReprocessingTrans(false);
       reprocessingTransPageRef.current = null;
     }
@@ -369,13 +459,6 @@ export default function ResultPage() {
     }
   }, [result, transBlocks]);
 
-  useEffect(() => {
-    if (result) {
-      setIsOcrPaused(result.ocr_paused === 'true');
-      setIsTransPaused(result.trans_paused === 'true');
-    }
-  }, [result]);
-
   const completedOcrPages = getCompletedPages(result?.ocr_text);
   const completedTransPages = getCompletedPages(result?.translated_text);
 
@@ -402,6 +485,32 @@ export default function ResultPage() {
     window.dispatchEvent(new Event('refresh-home-data'));
     router.push('/');
   }, [router]);
+
+  const handleContinueConfirm = async () => {
+    setShowContinueConfirm(false);
+    hasCalledContinueRef.current = true;
+    
+    setResult((prev: any) => prev ? ({ ...prev, status: 'processing' }) : null);
+    
+    const ocrModel = result?.ocr_model_id || selectedOcrModel;
+    const transModel = result?.translate_model_id || selectedTransModel;
+    const provider = providers.find(p => p.id.toString() === ocrModel?.split('/')[0]);
+    const endpoint = provider?.base_url || '';
+    const lang = result?.doc_language || docLanguage;
+    
+    try {
+      await continueProcessing(
+        id,
+        ocrModel,
+        transModel,
+        endpoint,
+        lang === 'auto' ? detectedLanguage : lang
+      );
+    } catch (err) {
+      hasCalledContinueRef.current = false;
+      console.error('Failed to continue processing:', err);
+    }
+  };
 
   if (loading && !result) {
     return (
@@ -482,10 +591,10 @@ export default function ResultPage() {
                result?.status === 'failed' ? '处理失败' : '等待中'}
               </span>
               <span className="text-gray-300">|</span>
-              <button onClick={handleSwitchModel} suppressHydrationWarning className="px-3 py-1.5 text-xs font-medium text-white bg-indigo-500 rounded hover:bg-indigo-600 transition-colors">模型设置</button>
-              <button onClick={() => setShowPromptModal(true)} suppressHydrationWarning className="px-3 py-1.5 text-xs font-medium text-white bg-violet-500 rounded hover:bg-violet-600 transition-colors">提示词设置</button>
-              <button onClick={() => setShowReprocessModal(true)} suppressHydrationWarning className="px-3 py-1.5 text-xs font-medium text-white bg-amber-500 rounded hover:bg-amber-600 transition-colors">重新处理</button>
-              <button onClick={() => setShowExportModal(true)} suppressHydrationWarning className="px-3 py-1.5 text-xs font-medium text-white bg-emerald-500 rounded hover:bg-emerald-600 transition-colors">结果导出</button>
+              <button onClick={handleSwitchModel} suppressHydrationWarning className="px-3 py-1.5 text-xs font-medium text-white rounded hover:opacity-80 transition-opacity" style={{ backgroundColor: '#8FA3A6' }}>模型设置</button>
+              <button onClick={() => setShowPromptModal(true)} suppressHydrationWarning className="px-3 py-1.5 text-xs font-medium text-white rounded hover:opacity-80 transition-opacity" style={{ backgroundColor: '#B5A8B5' }}>提示词设置</button>
+              <button onClick={() => setShowReprocessModal(true)} suppressHydrationWarning className="px-3 py-1.5 text-xs font-medium text-white rounded hover:opacity-80 transition-opacity" style={{ backgroundColor: '#C4A484' }}>重新处理</button>
+              <button onClick={() => setShowExportModal(true)} suppressHydrationWarning className="px-3 py-1.5 text-xs font-medium text-white rounded hover:opacity-80 transition-opacity" style={{ backgroundColor: '#7D9D9C' }}>结果导出</button>
             </div>
           </div>
         </div>
@@ -499,7 +608,19 @@ export default function ResultPage() {
             <CustomDropdown
               size="sm"
               value={docLanguage}
-              onChange={(val) => setDocLanguage(val)}
+              onChange={async (val) => {
+                if (val !== docLanguage) {
+                  setSavingLanguage(true);
+                  try {
+                    await updateRecordLanguage(id, val);
+                    setDocLanguage(val);
+                  } catch (err) {
+                    console.error('Failed to save language:', err);
+                  } finally {
+                    setSavingLanguage(false);
+                  }
+                }
+              }}
               options={[
                 { value: 'auto', label: languages.find(l => l.language_code === detectedLanguage)?.language_name ? `${languages.find(l => l.language_code === detectedLanguage)?.language_name}（自动检测）` : '自动检测' },
                 ...languages.map((lang) => ({
@@ -507,15 +628,20 @@ export default function ResultPage() {
                   label: lang.language_name
                 }))
               ]}
+              disabled={savingLanguage}
             />
             <div className="flex-1" />
             <div className="flex items-center gap-2">
-              <button onClick={() => setScale(s => s <= 0 ? 1.0 - SCALE_STEP : Math.max(s - SCALE_STEP, 0.5))} className="px-2 py-1 text-gray-900 bg-gray-50 border border-gray-200 rounded text-xs hover:bg-gray-100">−</button>
-              <button onClick={() => setScale(1.0)} className="px-2 py-1 text-gray-900 bg-gray-50 border border-gray-200 rounded text-xs hover:bg-gray-100">还原</button>
-              <button onClick={() => setScale(s => s <= 0 ? 1.0 + SCALE_STEP : Math.min(s + SCALE_STEP, 3.0))} className="px-2 py-1 text-gray-900 bg-gray-50 border border-gray-200 rounded text-xs hover:bg-gray-100">＋</button>
+              <div className="flex items-center bg-gray-50 border border-gray-200 rounded overflow-hidden">
+                <button onClick={() => imageViewerRef.current?.zoomOut()} className="px-2 py-1 text-gray-900 text-xs hover:bg-gray-100">−</button>
+                <div className="w-px h-4 bg-gray-200" />
+                <button onClick={() => imageViewerRef.current?.reset()} className="px-2 py-1 text-gray-900 text-xs hover:bg-gray-100">↻</button>
+                <div className="w-px h-4 bg-gray-200" />
+                <button onClick={() => imageViewerRef.current?.zoomIn()} className="px-2 py-1 text-gray-900 text-xs hover:bg-gray-100">＋</button>
+              </div>
               {result?.file_type === 'pdf' ? (
                 <>
-                  <button onClick={() => handlePageChange(currentPage - 1)} disabled={currentPage <= 1} className="px-2 py-1 text-gray-900 bg-gray-50 border border-gray-200 rounded text-xs hover:bg-gray-100 disabled:opacity-50">上一页</button>
+                  <button onClick={() => handlePageChange(currentPage - 1)} disabled={currentPage <= 1} className="px-2 py-1 text-gray-900 bg-gray-50 border border-gray-200 rounded text-xs hover:bg-gray-100 disabled:opacity-50">←</button>
                   {isEditingPage ? (
                     <input
                       type="text"
@@ -555,53 +681,24 @@ export default function ResultPage() {
                     </span>
                   )}
                   <span className="text-xs text-gray-700">/ {totalPages}</span>
-                  <button onClick={() => handlePageChange(currentPage + 1)} disabled={currentPage >= totalPages} className="px-2 py-1 text-gray-900 bg-gray-50 border border-gray-200 rounded text-xs hover:bg-gray-100 disabled:opacity-50">下一页</button>
+                  <button onClick={() => handlePageChange(currentPage + 1)} disabled={currentPage >= totalPages} className="px-2 py-1 text-gray-900 bg-gray-50 border border-gray-200 rounded text-xs hover:bg-gray-100 disabled:opacity-50">→</button>
                 </>
               ) : null}
             </div>
           </div>
-          <div className="flex-1 overflow-hidden p-2 flex flex-col items-center justify-center" ref={containerRef}>
+          <div className="flex-1 overflow-hidden" ref={containerRef}>
             {result?.file_type === 'jpg' && (
-              <div 
-                className="relative flex items-center justify-center"
-                style={{ 
-                  width: '100%', 
-                  height: '100%',
-                  cursor: 'grab'
-                }}
-                onWheel={(e) => {
-                  e.preventDefault();
-                  const delta = e.deltaY > 0 ? -0.1 : 0.1;
-                  setScale(s => {
-                    const newScale = s <= 0 ? 1 + delta : Math.max(0.3, Math.min(5.0, s + delta));
-                    return newScale;
-                  });
-                }}
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  setIsDragging(true);
-                  lastPos.current = { x: position.x, y: position.y };
-                }}
-              >
-                <img
-                  src={`http://localhost:8000/api/result/file/${id}`}
-                  alt="Original"
-                  draggable={false}
-                  style={{ 
-                    transform: `translate(${position.x}px, ${position.y}px) scale(${scale <= 0 ? 1 : scale})`, 
-                    maxWidth: '100%',
-                    maxHeight: '100%',
-                    pointerEvents: 'none'
-                  }}
-                />
-              </div>
+              <ImageViewer
+                ref={imageViewerRef}
+                src={`${API_BASE}/result/file/${id}`}
+                fileType="jpg"
+              />
             )}
             {result?.file_type === 'pdf' && (
-              <PDFViewer
-                fileUrl={`http://localhost:8000/api/result/file/${id}`}
-                currentPage={currentPage}
-                onPageChange={handlePageChange}
-                scale={scale <= 0 ? 1.0 : scale}
+              <ImageViewer
+                ref={imageViewerRef}
+                src={`${API_BASE}/result/page/${id}/${currentPage}`}
+                fileType="pdf"
               />
             )}
           </div>
@@ -630,43 +727,7 @@ export default function ResultPage() {
             />
             {!isOcrProcessing && <div className="flex-1" />}
             <div className="flex items-center gap-2">
-              {isOcrProcessing ? (
-                isOcrPaused ? (
-                  <button
-                    onClick={async () => {
-                      try {
-                        await resumeOcr(id);
-                        setIsOcrPaused(false);
-                      } catch (err) {
-                        console.error('Resume OCR failed:', err);
-                      }
-                    }}
-                    className="p-1 text-gray-500 hover:text-green-600 transition-colors"
-                    title="继续识别"
-                  >
-                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M8 5v14l11-7z" />
-                    </svg>
-                  </button>
-                ) : (
-                  <button
-                    onClick={async () => {
-                      try {
-                        await pauseOcr(id);
-                        setIsOcrPaused(true);
-                      } catch (err) {
-                        console.error('Pause OCR failed:', err);
-                      }
-                    }}
-                    className="p-1 text-gray-500 hover:text-amber-600 transition-colors"
-                    title="暂停识别"
-                  >
-                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" />
-                    </svg>
-                  </button>
-                )
-              ) : (
+              {isOcrProcessing ? null : (
                 <button
                   onClick={() => handleReprocessOcr(currentPage)}
                   disabled={isReprocessingOcr}
@@ -703,16 +764,16 @@ export default function ResultPage() {
                     onContextMenu={(e) => {
                       e.stopPropagation();
                     }}
-                    className={`text-sm px-3 py-2 rounded cursor-pointer ${
+                    className={`text-base px-3 py-2 rounded cursor-pointer ${
                       block.pageNum === currentPage ? 'text-gray-900 bg-gray-50 border border-gray-200' : 'text-gray-900 bg-transparent border border-transparent hover:border-gray-200 hover:bg-gray-50'
                     }`}
                   >
-                    <span className="inline-block px-1.5 py-0.5 mr-1 text-xs font-semibold rounded bg-blue-100 text-blue-800">P{block.pageNum}</span> <span className="whitespace-pre-line">{block.content}</span>
+                    <span className="inline-block px-1.5 py-0.5 mr-1 text-xs font-semibold rounded bg-blue-100 text-blue-800">P{block.pageNum}</span> <span className="whitespace-pre-wrap break-all">{block.content}</span>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="text-center py-8 text-gray-400 text-sm">
+              <div className="text-center py-8 text-gray-400 text-base">
                 {isOcrProcessing ? '正在识别...' : '尚未识别'}
               </div>
             )}
@@ -742,43 +803,7 @@ export default function ResultPage() {
             />
             {!isTransProcessing && <div className="flex-1" />}
             <div className="flex items-center gap-2">
-              {isTransProcessing ? (
-                isTransPaused ? (
-                  <button
-                    onClick={async () => {
-                      try {
-                        await resumeTranslate(id);
-                        setIsTransPaused(false);
-                      } catch (err) {
-                        console.error('Resume translate failed:', err);
-                      }
-                    }}
-                    className="p-1 text-gray-500 hover:text-green-600 transition-colors"
-                    title="继续翻译"
-                  >
-                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M8 5v14l11-7z" />
-                    </svg>
-                  </button>
-                ) : (
-                  <button
-                    onClick={async () => {
-                      try {
-                        await pauseTranslate(id);
-                        setIsTransPaused(true);
-                      } catch (err) {
-                        console.error('Pause translate failed:', err);
-                      }
-                    }}
-                    className="p-1 text-gray-500 hover:text-amber-600 transition-colors"
-                    title="暂停翻译"
-                  >
-                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" />
-                    </svg>
-                  </button>
-                )
-              ) : (
+              {isTransProcessing ? null : (
                 <button
                   onClick={() => handleReprocessTranslate(currentPage)}
                   disabled={isReprocessingTrans}
@@ -815,16 +840,16 @@ export default function ResultPage() {
                     onContextMenu={(e) => {
                       e.stopPropagation();
                     }}
-                    className={`text-sm px-3 py-2 rounded cursor-pointer ${
+                    className={`text-base px-3 py-2 rounded cursor-pointer ${
                       block.pageNum === currentPage ? 'text-gray-900 bg-gray-50 border border-gray-200' : 'text-gray-900 bg-transparent border border-transparent hover:border-gray-200 hover:bg-gray-50'
                     }`}
                   >
-                    <span className="inline-block px-1.5 py-0.5 mr-1 text-xs font-semibold rounded bg-green-100 text-green-800">P{block.pageNum}</span> <span className="whitespace-pre-line">{block.content}</span>
+                    <span className="inline-block px-1.5 py-0.5 mr-1 text-xs font-semibold rounded bg-green-100 text-green-800">P{block.pageNum}</span> <span className="whitespace-pre-wrap break-all">{block.content}</span>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="text-center py-8 text-gray-400 text-sm">
+              <div className="text-center py-8 text-gray-400 text-base">
                 {isTransProcessing ? '正在处理...' : '尚未翻译'}
               </div>
             )}
@@ -868,6 +893,45 @@ export default function ResultPage() {
         recordId={id}
         filename={result?.original_filename || ''}
       />
+
+      {showContinueConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowContinueConfirm(false)} />
+          
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-900">继续处理</h2>
+              <button
+                onClick={() => setShowContinueConfirm(false)}
+                className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            <div className="px-6 py-4">
+              <p className="text-gray-700">检测到本次任务未完成，是否继续？</p>
+            </div>
+            
+            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200">
+              <button
+                onClick={() => setShowContinueConfirm(false)}
+                className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-md transition-colors"
+              >
+                取消
+              </button>
+              <button
+                onClick={handleContinueConfirm}
+                className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+              >
+                确定
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

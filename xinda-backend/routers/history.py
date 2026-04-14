@@ -2,10 +2,17 @@ from fastapi import APIRouter, HTTPException
 from sqlalchemy.orm import Session
 from fastapi import Depends
 from typing import List
-from models.database import get_db, ProcessingHistory
+from models.database import get_db, ProcessingHistory, LanguagePrompt
 import os
 
 router = APIRouter()
+
+
+def _get_lang_color(lang_code: str, db: Session):
+    if not lang_code:
+        return None
+    lang = db.query(LanguagePrompt).filter(LanguagePrompt.language_code == lang_code).first()
+    return lang.color if lang else None
 
 
 @router.get("")
@@ -57,7 +64,9 @@ async def get_history(
                 "status": calculate_status(record),
                 "total_pages": record.total_pages,
                 "upload_time": record.upload_time.isoformat(),
-                "content_title": record.content_title
+                "content_title": record.content_title,
+                "doc_language": record.doc_language,
+                "language_color": _get_lang_color(record.doc_language, db) if record.doc_language else None
             }
             for record in records
         ],

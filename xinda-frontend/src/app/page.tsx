@@ -8,6 +8,7 @@ import SettingsPanel from '@/components/SettingsPanel';
 import ModelSettingsModal from '@/components/ModelSettingsModal';
 import PromptSettingsModal from '@/components/PromptSettingsModal';
 import DonationModal from '@/components/DonationModal';
+import { API_BASE } from '@/lib/api';
 
 export default function Home() {
   const router = useRouter();
@@ -44,7 +45,7 @@ export default function Home() {
 
     // Start processing in background (don't wait for response)
     fetch(
-      `http://localhost:8000/api/upload/${uploadedFileId}/process?ocr_model=${encodeURIComponent(ocrModel)}&translate_model=${encodeURIComponent(translateModel)}&endpoint=${encodeURIComponent(endpoint)}&language=${encodeURIComponent(docLanguage)}`,
+      `${API_BASE}/upload/${uploadedFileId}/process?ocr_model=${encodeURIComponent(ocrModel)}&translate_model=${encodeURIComponent(translateModel)}&endpoint=${encodeURIComponent(endpoint)}&language=${encodeURIComponent(docLanguage)}`,
       { method: 'POST' }
     ).catch(err => {
       console.error('Failed to start processing:', err);
@@ -66,7 +67,7 @@ export default function Home() {
             href="/usage"
             target="_blank"
             rel="noopener noreferrer"
-            className="absolute right-0 bottom-0 text-sm text-blue-600 hover:text-blue-800 underline"
+            className="absolute right-0 bottom-0 text-sm text-gray-400 hover:text-gray-500 no-underline"
           >
             使用指南
           </a>
@@ -120,14 +121,14 @@ export default function Home() {
           href="https://github.com/lilei2894/xinda"
           target="_blank"
           rel="noopener noreferrer"
-          className="text-blue-600 hover:text-blue-800 underline"
+          className="text-gray-400 hover:text-gray-500 no-underline"
         >
           GitHub
         </a>{' '}
         ·{' '}
         <button
           onClick={() => setShowDonationModal(true)}
-          className="text-blue-600 hover:text-blue-800 underline"
+          className="text-gray-400 hover:text-gray-500 no-underline"
         >
           捐赠 ☕
         </button>

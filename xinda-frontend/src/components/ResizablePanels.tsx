@@ -10,7 +10,7 @@ interface ResizablePanelsProps {
 
 export default function ResizablePanels({ 
   children, 
-  defaultSizes = [40, 30, 30],
+  defaultSizes = [34, 33, 33],
   minSizes = [20, 20, 20]
 }: ResizablePanelsProps) {
   const [sizes, setSizes] = useState(defaultSizes);

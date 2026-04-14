@@ -1,11 +1,11 @@
 import axios from 'axios';
 
-const API_URL =
+export const API_BASE =
   (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_API_URL) ||
   'http://localhost:8000/api';
 
 const api = axios.create({
-  baseURL: API_URL,
+  baseURL: API_BASE,
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
@@ -44,6 +44,8 @@ export interface ProcessingResult {
   translate_model_id?: string;
   doc_language?: string;
   model_endpoint?: string;
+  ocr_paused?: string;
+  trans_paused?: string;
 }
 
 export const uploadFile = async (file: File): Promise<UploadResponse> => {
@@ -88,6 +90,11 @@ export const updateRecordModel = async (id: string, ocrModelId?: string, transla
   if (ocrModelId !== undefined) data.ocr_model_id = ocrModelId;
   if (translateModelId !== undefined) data.translate_model_id = translateModelId;
   const response = await api.patch(`/result/${id}/model`, data);
+  return response.data;
+};
+
+export const updateRecordLanguage = async (id: string, docLanguage: string): Promise<{ id: string; doc_language: string }> => {
+  const response = await api.patch(`/result/${id}/language`, { doc_language: docLanguage });
   return response.data;
 };
 
@@ -231,24 +238,9 @@ export const updateExtendedConfig = async (config: {
   await api.post('/config', config);
 };
 
-export const pauseOcr = async (id: string): Promise<{ message: string; last_page: number }> => {
-  const response = await api.post(`/result/${id}/pause-ocr`);
-  return response.data;
-};
-
-export const resumeOcr = async (id: string): Promise<{ message: string }> => {
-  const response = await api.post(`/result/${id}/resume-ocr`);
-  return response.data;
-};
-
-export const pauseTranslate = async (id: string): Promise<{ message: string }> => {
-  const response = await api.post(`/result/${id}/pause-translate`);
-  return response.data;
-};
-
-export const resumeTranslate = async (id: string): Promise<{ message: string }> => {
-  const response = await api.post(`/result/${id}/resume-translate`);
-  return response.data;
+export const createStreamConnection = (id: string): EventSource => {
+  const streamUrl = `${API_BASE}/result/stream/${id}`;
+  return new EventSource(streamUrl);
 };
 
 export default api;

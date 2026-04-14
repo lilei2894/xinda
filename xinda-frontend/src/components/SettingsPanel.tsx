@@ -132,13 +132,15 @@ export default function SettingsPanel({ onOpenModelSettings, onOpenPromptSetting
         <div className="flex gap-2">
           <button
             onClick={onOpenModelSettings}
-            className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+            className="px-3 py-1.5 text-sm text-white rounded-md hover:opacity-80 transition-opacity"
+            style={{ backgroundColor: '#8FA3A6' }}
           >
             模型设置
           </button>
           <button
             onClick={onOpenPromptSettings}
-            className="px-3 py-1.5 text-sm bg-violet-500 text-white rounded-md hover:bg-violet-600 transition-colors"
+            className="px-3 py-1.5 text-sm text-white rounded-md hover:opacity-80 transition-opacity"
+            style={{ backgroundColor: '#B5A8B5' }}
           >
             提示词设置
           </button>
@@ -154,7 +156,10 @@ export default function SettingsPanel({ onOpenModelSettings, onOpenPromptSetting
             value={config?.doc_language || 'auto'}
             onChange={handleDocLanguageChange}
             options={[
-              { value: 'auto', label: '-- 自动检测 --' },
+              ...(config?.doc_language && config.doc_language !== 'auto' 
+                ? [{ value: 'auto', label: `自动检测（${config.doc_language.toUpperCase()}）` }]
+                : [{ value: 'auto', label: '-- 自动检测 --' }]
+              ),
               ...languages.map((lang) => ({
                 value: lang.language_code,
                 label: lang.language_name
@@ -223,7 +228,8 @@ export default function SettingsPanel({ onOpenModelSettings, onOpenPromptSetting
             onStartProcessing(ocrRaw, translateRaw, ocrConfig.endpoint, docLanguage);
           }
         }}
-        className="w-full mt-4 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
+        className="w-full mt-4 py-3 text-white font-medium rounded-lg hover:opacity-80 transition-opacity"
+        style={{ backgroundColor: '#A89F91' }}
       >
         开始处理
       </button>

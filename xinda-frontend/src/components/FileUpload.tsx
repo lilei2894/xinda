@@ -20,9 +20,9 @@ export default function FileUpload({ onUploadSuccess, onUploadError, isUploading
       return 'Only PDF and JPG files are allowed';
     }
     
-    const maxSize = 20 * 1024 * 1024;
+    const maxSize = 50 * 1024 * 1024;
     if (file.size > maxSize) {
-      return 'File size must be less than 20MB';
+      return 'File size must be less than 50MB';
     }
     
     return null;
@@ -108,7 +108,7 @@ export default function FileUpload({ onUploadSuccess, onUploadError, isUploading
         onDragLeave={handleDragLeave}
         className={`
           relative border-2 border-dashed rounded-lg p-12 text-center transition-colors h-full flex flex-col justify-center bg-white
-          ${isDragging ? 'border-blue-500 bg-blue-50' : 'border-gray-300'}
+          ${isDragging ? 'border-gray-500 bg-gray-50' : 'border-gray-300'}
           ${isUploading ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
         `}
       >
@@ -144,7 +144,7 @@ export default function FileUpload({ onUploadSuccess, onUploadError, isUploading
           </div>
           
           <div className="text-sm text-gray-500">
-            支持 PDF 或 JPG 文件，最大 20MB
+            支持 PDF 或 JPG 文件，最大 50MB
           </div>
         </label>
       </div>
@@ -153,8 +153,8 @@ export default function FileUpload({ onUploadSuccess, onUploadError, isUploading
         <div className="mt-4">
           <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
             <div
-              className="h-full bg-blue-600 transition-all duration-200"
-              style={{ width: `${uploadProgress}%` }}
+              className="h-full transition-all duration-200"
+              style={{ width: `${uploadProgress}%`, backgroundColor: '#A89F91' }}
             />
           </div>
           <div className="text-center text-sm text-gray-600 mt-2">

@@ -48,7 +48,8 @@ if __name__ == "__main__":
     import uvicorn
     
     parser = argparse.ArgumentParser()
-    parser.add_argument('--port', type=int, default=8000, help='Port to run the server on')
+    default_port = int(os.getenv("BACKEND_PORT", "8000"))
+    parser.add_argument('--port', type=int, default=default_port, help='Port to run the server on')
     args = parser.parse_args()
     
     uvicorn.run(app, host="0.0.0.0", port=args.port)

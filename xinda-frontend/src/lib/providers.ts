@@ -1,3 +1,5 @@
+import { API_BASE } from './api';
+
 export interface ModelEntry {
   id?: number;
   model_id: string;
@@ -128,7 +130,7 @@ export async function getLanguages(): Promise<LanguagePrompt[]> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10000);
   try {
-    const res = await fetch('http://localhost:8000/api/prompts', { 
+    const res = await fetch(`${API_BASE}/prompts`, { 
       signal: controller.signal 
     });
     return res.json();

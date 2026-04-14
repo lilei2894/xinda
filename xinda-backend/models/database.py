@@ -82,6 +82,7 @@ class LanguagePrompt(Base):
     language_name = Column(String, nullable=False)  # e.g., "English", "中文", "日本語"
     ocr_prompt = Column(Text, nullable=True)  # OCR prompt template
     translate_prompt = Column(Text, nullable=True)  # Translation prompt template
+    color = Column(String, nullable=True)  # Color for language tag, e.g., "#3B82F6"
     created_at = Column(DateTime, default=shanghai_now)
     updated_at = Column(DateTime, default=shanghai_now, onupdate=shanghai_now)
 
@@ -137,11 +138,18 @@ try:
                 language_name TEXT NOT NULL,
                 ocr_prompt TEXT,
                 translate_prompt TEXT,
+                color TEXT,
                 created_at TEXT,
                 updated_at TEXT
             )
         """)
         conn.commit()
+    else:
+        cursor.execute("PRAGMA table_info(language_prompts)")
+        lp_columns = [row[1] for row in cursor.fetchall()]
+        if "color" not in lp_columns:
+            cursor.execute("ALTER TABLE language_prompts ADD COLUMN color TEXT")
+            conn.commit()
     
     cursor.execute("SELECT COUNT(*) FROM language_prompts")
     if cursor.fetchone()[0] == 0:
@@ -204,18 +212,24 @@ Rules:
 8. 如果原文中有无法翻译的内容，用中文说明即可，不可保留日文"""
 
         default_prompts = [
-            ("en", "英文", default_en_ocr, default_en_trans),
-            ("ja", "日文", default_ja_ocr, default_ja_trans),
+            ("en", "英文", default_en_ocr, default_en_trans, "#8FA3A6"),
+            ("jp", "日文", default_ja_ocr, default_ja_trans, "#D4A5A5"),
         ]
-        for code, name, ocr, trans in default_prompts:
+        for code, name, ocr, trans, color in default_prompts:
             cursor.execute(
-                "INSERT OR IGNORE INTO language_prompts (language_code, language_name, ocr_prompt, translate_prompt, created_at, updated_at) VALUES (?, ?, ?, ?, datetime('now', '+8 hours'), datetime('now', '+8 hours'))",
-                (code, name, ocr, trans)
+                "INSERT OR IGNORE INTO language_prompts (language_code, language_name, ocr_prompt, translate_prompt, color, created_at, updated_at) VALUES (?, ?, ?, ?, ?, datetime('now', '+8 hours'), datetime('now', '+8 hours'))",
+                (code, name, ocr, trans, color)
             )
         conn.commit()
     else:
         cursor.execute("UPDATE language_prompts SET language_name = '英文' WHERE language_code = 'en'")
-        cursor.execute("UPDATE language_prompts SET language_name = '日文' WHERE language_code = 'ja'")
+        cursor.execute("UPDATE language_prompts SET language_name = '日文' WHERE language_code = 'jp'")
+        cursor.execute("UPDATE language_prompts SET color = '#8FA3A6' WHERE language_code = 'en' AND (color IS NULL OR color = '')")
+        cursor.execute("UPDATE language_prompts SET color = '#D4A5A5' WHERE language_code = 'jp' AND (color IS NULL OR color = '')")
+        
+        cursor.execute("UPDATE language_prompts SET language_code = 'jp' WHERE language_code = 'ja'")
+        cursor.execute("UPDATE processing_history SET doc_language = 'jp' WHERE doc_language = 'ja'")
+        cursor.execute("UPDATE processing_history SET model_endpoint = 'jp' WHERE model_endpoint = 'ja'")
         conn.commit()
     
     conn.close()

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { API_BASE } from '@/lib/api';
 
 interface LanguagePrompt {
   id: number;
@@ -8,6 +9,7 @@ interface LanguagePrompt {
   language_name: string;
   ocr_prompt: string | null;
   translate_prompt: string | null;
+  color: string | null;
 }
 
 interface PromptSettingsModalProps {
@@ -16,9 +18,18 @@ interface PromptSettingsModalProps {
   onPromptsChange?: () => void;
 }
 
-const API_BASE = 'http://localhost:8000/api';
-
 type SubTab = 'ocr' | 'translate';
+
+const COLOR_OPTIONS = [
+  '#7D9D9C',
+  '#C4A484',
+  '#B5A8B5',
+  '#D4A5A5',
+  '#8FA3A6',
+  '#A89F91',
+  '#9CA3AF',
+  '#E0D6CC',
+];
 
 export default function PromptSettingsModal({ isOpen, onClose, onPromptsChange }: PromptSettingsModalProps) {
   const [languages, setLanguages] = useState<LanguagePrompt[]>([]);
@@ -76,6 +87,15 @@ export default function PromptSettingsModal({ isOpen, onClose, onPromptsChange }
     }));
   };
 
+  const updateCurrentColor = (color: string) => {
+    setLanguages(prev => prev.map(l => {
+      if (l.language_code === selectedLanguage) {
+        return { ...l, color };
+      }
+      return l;
+    }));
+  };
+
   const handleSave = async () => {
     if (!currentLang) return;
     setSaving(true);
@@ -85,7 +105,8 @@ export default function PromptSettingsModal({ isOpen, onClose, onPromptsChange }
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ocr_prompt: currentLang.ocr_prompt,
-          translate_prompt: currentLang.translate_prompt
+          translate_prompt: currentLang.translate_prompt,
+          color: currentLang.color
         }),
       });
       setSaved(true);
@@ -215,7 +236,7 @@ export default function PromptSettingsModal({ isOpen, onClose, onPromptsChange }
           <div className="flex-1 flex flex-col">
             {currentLang && (
               <>
-                <div className="flex border-b border-gray-200">
+                <div className="flex items-center border-b border-gray-200">
                   <button
                     onClick={() => setSubTab('ocr')}
                     className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
@@ -236,6 +257,20 @@ export default function PromptSettingsModal({ isOpen, onClose, onPromptsChange }
                   >
                     翻译
                   </button>
+                  <div className="flex-1" />
+                  <div className="flex items-center gap-2 pr-4" title="选择语种标签颜色">
+                    {COLOR_OPTIONS.map((c) => (
+                      <button
+                        key={c}
+                        onClick={() => updateCurrentColor(c)}
+                        className={`w-5 h-5 rounded-full border-2 transition-transform ${
+                          currentLang.color === c ? 'border-gray-900 scale-110' : 'border-transparent hover:scale-110'
+                        }`}
+                        style={{ backgroundColor: c }}
+                        title={c}
+                      />
+                    ))}
+                  </div>
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-4">

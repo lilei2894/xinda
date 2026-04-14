@@ -123,10 +123,10 @@ export default function HistoryList() {
                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-12">
                       页数
                     </th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-36">
+                    <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-32">
                       上传时间
                     </th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24">
+                    <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-20">
                       状态
                     </th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24">
@@ -150,36 +150,52 @@ export default function HistoryList() {
                           </span>
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-500 text-left" style={{ maxWidth: '20em' }}>
-                          <span className="block truncate" title={record.content_title || ''}>
-                            {record.content_title || '-'}
-                          </span>
+                          <div className="flex items-center gap-1">
+                            {record.doc_language && record.doc_language !== 'auto' && (
+                              <span 
+                                className="px-1.5 py-0.5 text-xs font-medium rounded"
+                                style={{ 
+                                  backgroundColor: record.language_color || '#3B82F6',
+                                  color: 'white'
+                                }}
+                              >
+                                {record.doc_language.toUpperCase()}
+                              </span>
+                            )}
+                            <span className="truncate" title={record.content_title || ''}>
+                              {record.content_title || '-'}
+                            </span>
+                          </div>
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-500 text-right">
+                        <td className="py-3 pl-2 pr-1 text-sm text-gray-500 text-right">
                           {record.total_pages || '-'}
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-500 text-center">
+                        <td className="py-3 pl-2 pr-1 text-sm text-gray-500 text-right">
                           {new Date(record.upload_time).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}
                         </td>
-                        <td className="px-4 py-3 text-center">
-                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${status.color}`}>
+                        <td className="py-3 pl-2 pr-2 text-center">
+                          <span className={`px-1 inline-flex text-xs leading-4 font-semibold rounded-full ${status.color}`}>
                             {status.text}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-sm font-medium text-center">
+                        <td className="px-2 py-3 text-sm font-medium text-center align-middle">
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
                               window.location.href = `/result/${record.id}`;
                             }}
-                            className="text-blue-600 hover:text-blue-900 mr-3"
+                            className="text-blue-600 hover:text-blue-900 mr-3 align-middle"
                           >
                             查看
                           </button>
                           <button
                             onClick={(e) => handleDelete(record.id, e)}
-                            className="text-red-600 hover:text-red-900"
+                            className="text-gray-400 hover:text-red-500 align-middle"
+                            title="删除"
                           >
-                            删除
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
                           </button>
                         </td>
                       </tr>

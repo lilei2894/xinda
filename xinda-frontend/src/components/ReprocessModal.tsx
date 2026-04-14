@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { getProviders, resetProcessing, continueProcessing } from '@/lib/api';
+import { getProviders, resetProcessing, continueProcessing, API_BASE } from '@/lib/api';
 import type { Provider } from '@/lib/providers';
 import { flattenModelsForType } from '@/lib/providers';
 
@@ -42,7 +42,7 @@ export default function ReprocessModal({ isOpen, onClose, recordId, onSuccess, i
       const [ocrP, ocrM] = ocrModel.split('/');
       const [transP, transM] = transModel.split('/');
       const ocrProvider = providers.find(p => p.id === parseInt(ocrP));
-      await fetch(`http://localhost:8000/api/result/${recordId}/reset`, {
+      await fetch(`${API_BASE}/result/${recordId}/reset`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -74,7 +74,7 @@ export default function ReprocessModal({ isOpen, onClose, recordId, onSuccess, i
         ocrModel,
         transModel,
         ocrProvider?.base_url || '',
-        'ja'
+        'jp'
       );
       onSuccess();
       onClose();

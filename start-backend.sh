@@ -1,6 +1,8 @@
 #!/bin/bash
 
-echo "Starting Backend Server..."
+BACKEND_PORT=${BACKEND_PORT:-8000}
+
+echo "Starting Backend Server on port ${BACKEND_PORT}..."
 
 cd xinda-backend
 
@@ -19,4 +21,5 @@ echo "Creating necessary directories..."
 mkdir -p uploads data
 
 echo "Starting FastAPI server..."
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
+export BACKEND_PORT
+uvicorn main:app --reload --host 0.0.0.0 --port ${BACKEND_PORT}
