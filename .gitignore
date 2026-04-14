@@ -41,6 +41,10 @@ next-env.d.ts
 data/
 uploads/
 
+# Installation packages
+Environment dependencies/
+*.exe
+
 # Python
 __pycache__/
 *.py[cod]

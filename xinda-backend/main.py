@@ -12,9 +12,14 @@ load_dotenv()
 
 app = FastAPI(title="xinda API", redirect_slashes=False)
 
+# CORS configuration - can be controlled via environment variable
+# Default is "*" for local development, can be set to specific origins for production
+ALLOWED_ORIGINS_STR = os.getenv("ALLOWED_ORIGINS", "*")
+ALLOWED_ORIGINS = ALLOWED_ORIGINS_STR.split(",") if ALLOWED_ORIGINS_STR != "*" else ["*"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -86,6 +86,10 @@ class LanguagePrompt(Base):
     created_at = Column(DateTime, default=shanghai_now)
     updated_at = Column(DateTime, default=shanghai_now, onupdate=shanghai_now)
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 Base.metadata.create_all(bind=engine)
 
 # Migration: add columns to tables if not exist
@@ -229,10 +233,11 @@ try:
     cursor.execute("UPDATE language_prompts SET ocr_prompt = ?, translate_prompt = ? WHERE language_code = 'es'", (ocr_template.format(lang="西班牙文"), trans_template.format(lang="西班牙文")))
     
     conn.commit()
-    
+
     conn.close()
-except Exception:
-    pass
+except Exception as e:
+    # Log migration errors but don't crash - database may be fresh or already migrated
+    logger.warning(f"Database migration check failed (this is normal for fresh databases): {e}")
 
 def seed_default_providers(db):
     pass

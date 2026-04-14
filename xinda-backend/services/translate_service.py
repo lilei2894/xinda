@@ -17,6 +17,8 @@ class TranslateService:
         self.language = language or "jp"
         self.api_key = api_key
         self.max_translate_retries = int(os.getenv("TRANSLATE_MAX_RETRIES", "2"))
+        self.translate_timeout = int(os.getenv("TRANSLATE_TIMEOUT", "300"))
+        self.title_timeout = int(os.getenv("TRANSLATE_TITLE_TIMEOUT", "60"))
     
     def _get_headers(self):
         headers = {"Content-Type": "application/json"}
@@ -24,11 +26,13 @@ class TranslateService:
             headers["Authorization"] = f"Bearer {self.api_key}"
         return headers
     
-    def _post_with_curl(self, url, payload, timeout=300):
+    def _post_with_curl(self, url, payload, timeout=None):
+        if timeout is None:
+            timeout = self.translate_timeout
         curl_headers = ["-H", "Content-Type: application/json"]
         if self.api_key:
             curl_headers.extend(["-H", f"Authorization: Bearer {self.api_key}"])
-        
+
         cmd = [
             "curl", "-s", "-X", "POST",
             *curl_headers,
@@ -37,11 +41,11 @@ class TranslateService:
             "-m", str(timeout),
             url
         ]
-        
+
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout + 10)
         if result.returncode != 0:
             raise Exception(f"curl failed: {result.stderr}")
-        
+
         return json.loads(result.stdout)
     
     def _contains_source_language(self, text):
@@ -124,7 +128,7 @@ class TranslateService:
         last_error = None
         for attempt in range(self.max_translate_retries + 1):
             try:
-                response = requests.post(url, headers=self._get_headers(), json=payload, timeout=300)
+                response = requests.post(url, headers=self._get_headers(), json=payload, timeout=self.translate_timeout)
                 response.raise_for_status()
                 result = response.json()
             except requests.ConnectionError:
@@ -193,7 +197,7 @@ class TranslateService:
                     ],
                     "max_tokens": 50
                 },
-                timeout=60
+                timeout=self.title_timeout
             )
             response.raise_for_status()
             result = response.json()
@@ -238,7 +242,7 @@ class TranslateService:
         }
         
         try:
-            response = requests.post(url, headers=self._get_headers(), json=payload, stream=True, timeout=300)
+            response = requests.post(url, headers=self._get_headers(), json=payload, stream=True, timeout=self.translate_timeout)
             response.raise_for_status()
             
             full_text = ""

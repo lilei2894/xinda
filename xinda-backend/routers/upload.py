@@ -7,6 +7,7 @@ import uuid
 import threading
 import time
 import sys
+import re
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
 from models.database import get_db, ProcessingHistory, Provider
@@ -18,12 +19,29 @@ router = APIRouter()
 
 UPLOAD_DIR = os.getenv("UPLOAD_DIR", "./uploads")
 MAX_FILE_SIZE = int(os.getenv("MAX_FILE_SIZE", "52428800"))
+MAX_PDF_PAGES = int(os.getenv("MAX_PDF_PAGES", "500"))
 
 upload_executor = ThreadPoolExecutor(max_workers=2)
 
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 ALLOWED_TYPES = ["application/pdf", "image/jpeg", "image/jpg"]
+ALLOWED_EXTENSIONS = [".pdf", ".jpg", ".jpeg"]
+
+def sanitize_filename(filename: str) -> str:
+    """Sanitize filename to prevent path traversal and ensure safe characters."""
+    # Remove path separators and null bytes
+    filename = filename.replace("/", "_").replace("\\", "_").replace("\x00", "")
+    # Keep only alphanumeric, dots, underscores, hyphens, and Chinese characters
+    filename = re.sub(r'[^\w\u4e00-\u9fff.-]', '_', filename)
+    # Prevent empty filename
+    if not filename or filename.strip() == "":
+        filename = "unnamed_file"
+    # Limit length
+    if len(filename) > 200:
+        name, ext = os.path.splitext(filename)
+        filename = name[:200-len(ext)] + ext
+    return filename
 
 
 def process_file_background(record_id: str, file_path: str, file_type: str, ocr_model: str, translate_model: str, endpoint: str, language: str = "jp", ocr_api_key: str = None, translate_api_key: str = None):
@@ -336,53 +354,91 @@ async def upload_file(
     file: UploadFile = File(...),
     db: Session = Depends(get_db)
 ):
+    # Validate content type
     if file.content_type not in ALLOWED_TYPES:
         raise HTTPException(
             status_code=400,
-            detail="Only PDF and JPG files are allowed"
+            detail=f"Invalid file type '{file.content_type}'. Only PDF and JPG files are allowed"
         )
-    
+
+    # Check file extension
+    file_ext = os.path.splitext(file.filename)[1].lower()
+    if file_ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid file extension '{file_ext}'. Allowed: {', '.join(ALLOWED_EXTENSIONS)}"
+        )
+
+    # Check file size
     file.file.seek(0, 2)
     file_size = file.file.tell()
     file.file.seek(0)
-    
+
     if file_size > MAX_FILE_SIZE:
+        max_mb = MAX_FILE_SIZE / (1024 * 1024)
         raise HTTPException(
             status_code=413,
-            detail=f"File size exceeds {MAX_FILE_SIZE} bytes limit"
+            detail=f"File size ({file_size / (1024 * 1024):.1f}MB) exceeds limit of {max_mb:.0f}MB"
         )
-    
+
+    if file_size == 0:
+        raise HTTPException(
+            status_code=400,
+            detail="File is empty"
+        )
+
+    # Sanitize filename
+    safe_filename = sanitize_filename(file.filename)
+
     file_id = str(uuid.uuid4())
     file_extension = os.path.splitext(file.filename)[1]
     saved_filename = f"{file_id}{file_extension}"
     file_path = os.path.join(UPLOAD_DIR, saved_filename)
-    
+
     with open(file_path, "wb") as buffer:
         content = await file.read()
         buffer.write(content)
-    
+
     file_type = "pdf" if file.content_type == "application/pdf" else "jpg"
-    
+
+    # Check PDF page count and validate
+    total_pages = None
+    if file_type == "pdf":
+        import fitz
+        try:
+            pdf_doc = fitz.open(file_path)
+            total_pages = pdf_doc.page_count
+            pdf_doc.close()
+
+            if total_pages > MAX_PDF_PAGES:
+                # Return warning but still accept the file
+                pass  # Frontend should handle this based on total_pages value
+            if total_pages == 0:
+                raise HTTPException(
+                    status_code=400,
+                    detail="PDF file has no pages"
+                )
+        except Exception as e:
+            if "PDF" in str(e) or "page" in str(e).lower():
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid PDF file: {str(e)}"
+                )
+
     record = ProcessingHistory(
         id=file_id,
-        original_filename=file.filename,
+        original_filename=safe_filename,
         file_type=file_type,
         file_path=file_path,
-        total_pages=None,
+        total_pages=str(total_pages) if total_pages else None,
         status="pending"
     )
-    
-    if record.file_type == "pdf":
-        import fitz
-        pdf_doc = fitz.open(file_path)
-        record.total_pages = str(pdf_doc.page_count)
-        pdf_doc.close()
-    
+
     db.add(record)
     db.commit()
     db.refresh(record)
-    
-    return {
+
+    response = {
         "id": record.id,
         "original_filename": record.original_filename,
         "file_type": record.file_type,
@@ -390,6 +446,12 @@ async def upload_file(
         "status": record.status,
         "upload_time": record.upload_time.isoformat()
     }
+
+    # Add warning for large PDFs
+    if total_pages and total_pages > MAX_PDF_PAGES:
+        response["warning"] = f"PDF has {total_pages} pages. Recommended maximum is {MAX_PDF_PAGES} pages for optimal performance."
+
+    return response
 
 
 @router.post("/{file_id}/process", response_model=dict)

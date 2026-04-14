@@ -29,7 +29,7 @@
 ## 技术栈
 
 ### 前端
-- **Next.js 15.2.4** - React 框架（使用 webpack 模式以确保兼容性）
+- **Next.js 16** - React 框架（使用 webpack 模式以确保兼容性）
 - **TypeScript** - 类型安全
 - **Tailwind CSS** - 样式框架
 - **Axios** - HTTP 客户端

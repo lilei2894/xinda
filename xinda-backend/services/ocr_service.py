@@ -20,6 +20,8 @@ class OCRService:
         self.language = language or "jp"
         self.api_key = api_key
         self.max_ocr_retries = int(os.getenv("OCR_MAX_RETRIES", "2"))
+        self.ocr_timeout = int(os.getenv("OCR_TIMEOUT", "300"))
+        self.detect_timeout = int(os.getenv("OCR_DETECT_TIMEOUT", "60"))
     
     def _get_headers(self):
         headers = {"Content-Type": "application/json"}
@@ -27,11 +29,13 @@ class OCRService:
             headers["Authorization"] = f"Bearer {self.api_key}"
         return headers
     
-    def _post_with_curl(self, url, payload, timeout=300):
+    def _post_with_curl(self, url, payload, timeout=None):
+        if timeout is None:
+            timeout = self.ocr_timeout
         curl_headers = ["-H", "Content-Type: application/json"]
         if self.api_key:
             curl_headers.extend(["-H", f"Authorization: Bearer {self.api_key}"])
-        
+
         cmd = [
             "curl", "-s", "-X", "POST",
             *curl_headers,
@@ -40,11 +44,11 @@ class OCRService:
             "-m", str(timeout),
             url
         ]
-        
+
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout + 10)
         if result.returncode != 0:
             raise Exception(f"curl failed: {result.stderr}")
-        
+
         return json.loads(result.stdout)
     
     def detect_hallucination(self, text):
@@ -142,7 +146,7 @@ class OCRService:
                     'max_tokens': 10,
                     'temperature': 0.1,
                 },
-                timeout=60
+                timeout=self.detect_timeout
             )
             print(f'[DETECT-LANG] Response status: {response.status_code}')
             response.raise_for_status()
@@ -201,7 +205,7 @@ class OCRService:
         last_error = None
         for attempt in range(self.max_ocr_retries + 1):
             try:
-                response = requests.post(url, headers=self._get_headers(), json=payload, timeout=300)
+                response = requests.post(url, headers=self._get_headers(), json=payload, timeout=self.ocr_timeout)
                 response.raise_for_status()
                 result = response.json()
             except requests.ConnectionError:
@@ -277,7 +281,7 @@ class OCRService:
         }
         
         try:
-            response = requests.post(url, headers=self._get_headers(), json=payload, stream=True, timeout=300)
+            response = requests.post(url, headers=self._get_headers(), json=payload, stream=True, timeout=self.ocr_timeout)
             response.raise_for_status()
             
             full_text = ""

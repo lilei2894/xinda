@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from sqlalchemy.orm import Session
 from fastapi import Depends
 import os
@@ -18,16 +18,16 @@ async def export_to_word(
     db: Session = Depends(get_db)
 ):
     record = db.query(ProcessingHistory).filter(ProcessingHistory.id == record_id).first()
-    
+
     if not record:
-        return {"error": "Record not found"}
-    
+        raise HTTPException(status_code=404, detail="Record not found")
+
     if record.status != "completed":
-        return {"error": "Record not processed yet"}
-    
+        raise HTTPException(status_code=400, detail="Record not processed yet")
+
     word_file = export_service.export_to_word(record)
     safe_name = urllib.parse.quote(f"result_{record_id}.docx")
-    
+
     return StreamingResponse(
         io.BytesIO(word_file.read()),
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -44,8 +44,8 @@ async def export_ocr_only(
 ):
     record = db.query(ProcessingHistory).filter(ProcessingHistory.id == record_id).first()
     if not record:
-        return {"error": "Record not found"}
-    
+        raise HTTPException(status_code=404, detail="Record not found")
+
     word_file = export_service.export_ocr_only(record)
     safe_name = urllib.parse.quote(f"{record.original_filename}_识别稿.docx")
     return StreamingResponse(
@@ -64,8 +64,8 @@ async def export_translate_only(
 ):
     record = db.query(ProcessingHistory).filter(ProcessingHistory.id == record_id).first()
     if not record:
-        return {"error": "Record not found"}
-    
+        raise HTTPException(status_code=404, detail="Record not found")
+
     word_file = export_service.export_translate_only(record)
     safe_name = urllib.parse.quote(f"{record.original_filename}_翻译稿.docx")
     return StreamingResponse(
