@@ -17,13 +17,12 @@
 
 - ✅ 文件上传（支持 PDF 和 JPG，最大 50MB）
 - ✅ 多语种 OCR 文本识别（自动检测或手动选择）
-- ✅ 多语种翻译为中文（日文、英文、德文、法文等）
+- ✅ 多语种翻译为中文（日文、英文、德文、法文、俄文、西班牙文）
 - ✅ 图文对照展示
 - ✅ Word 文档导出（识别稿/翻译稿）
 - ✅ 历史记录管理
 - ✅ 模型端点配置（支持 Ollama、OpenAI、Custom AI 等）
 - ✅ 可自定义提示词模板
-- ✅ 暂停/继续功能（OCR、翻译可独立控制）
 - ✅ 重新识别/翻译当前页
 
 
@@ -150,10 +149,6 @@ npm run dev
 | GET | /api/export/{id}/translate | 导出翻译稿 |
 | GET | /api/providers | 获取模型供应商列表 |
 | POST | /api/prompts | 管理提示词配置 |
-| POST | /api/result/{id}/pause-ocr | 暂停 OCR |
-| POST | /api/result/{id}/resume-ocr | 继续 OCR |
-| POST | /api/result/{id}/pause-translate | 暂停翻译 |
-| POST | /api/result/{id}/resume-translate | 继续翻译 |
 
 ## 已知问题与限制
 
