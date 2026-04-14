@@ -67,11 +67,11 @@ def process_file_background(record_id: str, file_path: str, file_type: str, ocr_
                 print(f"[LANG-DEBUG] Detect FAILED: {e}")
                 import traceback
                 traceback.print_exc()
-                language = "jp"
-                record.model_endpoint = "jp"
+                language = "en"
+                record.model_endpoint = "en"
                 record.doc_language = "auto"
                 db.commit()
-                print(f"[LANG-DEBUG] Fallback to jp")
+                print(f"[LANG-DEBUG] Fallback to en")
         
         db.commit()
         
