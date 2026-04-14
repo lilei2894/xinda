@@ -54,7 +54,6 @@ export default function ResultPage() {
   const [showExportModal, setShowExportModal] = useState(false);
   const [showModelModal, setShowModelModal] = useState(false);
   const [showPromptModal, setShowPromptModal] = useState(false);
-  const [showContinueConfirm, setShowContinueConfirm] = useState(false);
   const [providers, setProviders] = useState<Provider[]>([]);
   const [languages, setLanguages] = useState<LanguagePrompt[]>([]);
   const [docLanguage, setDocLanguage] = useState<string>('auto');
@@ -76,7 +75,6 @@ export default function ResultPage() {
   const prevTransContentRef = useRef<string>('');
   const stuckProgressRef = useRef<{ocr: number; trans: number; count: number}>({ocr: 0, trans: 0, count: 0});
   const hasCalledContinueRef = useRef<boolean>(false);
-  const hasCheckedCompletionRef = useRef<boolean>(false);
   const fetchingRef = useRef<boolean>(false);
   const isMountedRef = useRef<boolean>(true);
 
@@ -93,11 +91,6 @@ export default function ResultPage() {
       const dataOcrComplete = getCompletedPages(data.ocr_text);
       const dataTransComplete = getCompletedPages(data.translated_text);
       const dataIsComplete = dataOcrComplete >= dataTotalPages && dataTransComplete >= dataTotalPages && dataTotalPages > 0;
-      
-      if (!dataIsComplete && data.ocr_text && dataOcrComplete > 0 && !hasCheckedCompletionRef.current) {
-        hasCheckedCompletionRef.current = true;
-        setShowContinueConfirm(true);
-      }
       
       if (data.total_pages) {
         setTotalPages(parseInt(data.total_pages) || 1);
@@ -486,32 +479,6 @@ export default function ResultPage() {
     router.push('/');
   }, [router]);
 
-  const handleContinueConfirm = async () => {
-    setShowContinueConfirm(false);
-    hasCalledContinueRef.current = true;
-    
-    setResult((prev: any) => prev ? ({ ...prev, status: 'processing' }) : null);
-    
-    const ocrModel = result?.ocr_model_id || selectedOcrModel;
-    const transModel = result?.translate_model_id || selectedTransModel;
-    const provider = providers.find(p => p.id.toString() === ocrModel?.split('/')[0]);
-    const endpoint = provider?.base_url || '';
-    const lang = result?.doc_language || docLanguage;
-    
-    try {
-      await continueProcessing(
-        id,
-        ocrModel,
-        transModel,
-        endpoint,
-        lang === 'auto' ? detectedLanguage : lang
-      );
-    } catch (err) {
-      hasCalledContinueRef.current = false;
-      console.error('Failed to continue processing:', err);
-    }
-  };
-
   if (loading && !result) {
     return (
       <div className="h-screen flex items-center justify-center">
@@ -893,45 +860,6 @@ export default function ResultPage() {
         recordId={id}
         filename={result?.original_filename || ''}
       />
-
-      {showContinueConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowContinueConfirm(false)} />
-          
-          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900">继续处理</h2>
-              <button
-                onClick={() => setShowContinueConfirm(false)}
-                className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            
-            <div className="px-6 py-4">
-              <p className="text-gray-700">检测到本次任务未完成，是否继续？</p>
-            </div>
-            
-            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200">
-              <button
-                onClick={() => setShowContinueConfirm(false)}
-                className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-md transition-colors"
-              >
-                取消
-              </button>
-              <button
-                onClick={handleContinueConfirm}
-                className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-              >
-                确定
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

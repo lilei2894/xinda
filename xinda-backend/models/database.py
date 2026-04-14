@@ -151,86 +151,84 @@ try:
             cursor.execute("ALTER TABLE language_prompts ADD COLUMN color TEXT")
             conn.commit()
     
-    cursor.execute("SELECT COUNT(*) FROM language_prompts")
-    if cursor.fetchone()[0] == 0:
-        default_en_ocr = """Please identify the main document content in this image.
+    ocr_template = """# Role
+你是一名专业的文档OCR识别专家，擅长识别和处理历史档案文献中的{lang}文本。
 
-【Paragraph Merging Rules - Most Important, Must Follow Strictly】
-- Text from the same natural paragraph that was cut due to layout width must be merged into one line, without any line breaks in between
-- Only insert a line break when the content is clearly a new paragraph (e.g., indented start, heading, subtitle)
-- Separate paragraphs with two line breaks (\\n\\n)
-- Headings and subtitles must be on their own lines, with one blank line before and after
-- List items, table rows, etc. must each be on their own line
+# Task
+识别图片中{lang}主体文档的全部文本内容，输出完整的识别结果。
 
-【Content Requirements】
-- Only identify the main document text in the center of the image, ignore peripheral content
-- Ignore: REEL numbers, institutional watermarks, headers/footers, scan marks, archive numbers, text outside borders
-- Output only the identified text, nothing else
-- Do not output HTML tags, XML tags, or any markup
-- Do not add any explanations, notes, or prefixes
-- Never repeat the same paragraph multiple times"""
+# Format Requirements
+1. **段落合并**：同一自然段落因排版宽度被切断的文字，必须合并为一行，中间不换行
+2. **段落分隔**：段落之间用两个换行符（空一行）分隔
+3. **标题处理**：标题和副标题独占一行，前后各空一行
+4. **列表处理**：列表项、表格行各自独占一行
 
-        default_en_trans = """You are a professional English-to-Chinese translator. Your sole responsibility is to translate English text into modern Chinese written language.
+# OCR Principles
+1. **主体识别**：仅识别图片中央的主体文档文本
+2. **边缘忽略**：忽略以下边缘内容：
+   - REEL编号、胶片编号
+   - 机构水印、印章
+   - 页眉、页脚
+   - 扫描标记、档案编号
+   - 边框外的文字
+3. **输出纯净**：
+   - 仅输出识别的{lang}文本
+   - 不输出HTML/XML标签或格式标记
+   - 不添加任何解释、说明、前缀、标注
+   - 不重复同一段文字
 
-Rules:
-1. Output must be 100% Chinese translation results, absolutely no English words or phrases
-2. Do not retain original English text or fragments
-3. Do not use classical Chinese or semi-classical expressions
-4. Must use modern Chinese written language (similar to news reports, academic papers)
-5. Proper nouns (names, places, institutions) should be transliterated into Chinese characters
-6. Strictly maintain the original paragraph structure, never merge multiple paragraphs into one
-7. Absolutely do not output any explanations, notes, prefixes, suffixes, headings, or markers
-8. If there is content that cannot be translated, explain it in Chinese"""
+# Output
+直接输出识别的文本内容，无需任何附加说明。"""
 
-        default_ja_ocr = """请识别这张图片中的日文主体文档内容。
+    trans_template = """请将以下{lang}文本翻译成中文。
 
-【段落合并规则 - 最重要，必须严格遵守】
-- 图片中因排版宽度而被切断的同一自然段的文字，必须合并为一行，中间不要有任何换行
-- 只有当内容明显是新段落（如缩进开头、标题、副标题）时才换行
-- 段落之间必须用两个换行符（\\n\\n）分隔
-- 标题、副标题必须独占一行，前后各空一行
-- 列表项、表格行等必须各自独占一行
+要求：
+1. 直接输出翻译结果，不要任何解释或说明
+2. 保持原文段落结构
+3. 使用现代白话中文，不用文言文
+4. 人名地名机构名用中文音译"""
 
-【内容要求】
-- 仅识别图片中央的主体文档文本，忽略边缘的附加内容
-- 忽略：REEL编号、机构水印、页眉页脚、扫描标记、档案编号、边框外的文字
-- 仅输出识别出的日文文本，不要任何其他内容
-- 不要输出HTML标签、XML标签或任何 markup
-- 不要添加任何解释、说明或前缀
-- 绝不可重复同一段文字多次"""
-
-        default_ja_trans = """你是一名专业日中翻译员。你的唯一职责是将日文翻译成现代中文白话书面语。
-
-规则：
-1. 输出必须100%为中文翻译结果，绝不可包含任何日文假名（平假名、片假名）
-2. 不得保留日文原文或日文片段
-3. 不得使用文言文、古文或半文半白的表达
-4. 必须使用现代中文白话书面语（类似新闻报道、学术论文的语体）
-5. 专有名词（人名、地名、机构名）音译为中文汉字
-6. 严格保持原文段落结构，绝不可将多个段落合并为一段
-7. 绝对不要输出任何解释、说明、前缀、后缀、标题、标记
-8. 如果原文中有无法翻译的内容，用中文说明即可，不可保留日文"""
-
-        default_prompts = [
-            ("en", "英文", default_en_ocr, default_en_trans, "#8FA3A6"),
-            ("jp", "日文", default_ja_ocr, default_ja_trans, "#D4A5A5"),
-        ]
-        for code, name, ocr, trans, color in default_prompts:
-            cursor.execute(
-                "INSERT OR IGNORE INTO language_prompts (language_code, language_name, ocr_prompt, translate_prompt, color, created_at, updated_at) VALUES (?, ?, ?, ?, ?, datetime('now', '+8 hours'), datetime('now', '+8 hours'))",
-                (code, name, ocr, trans, color)
-            )
-        conn.commit()
-    else:
-        cursor.execute("UPDATE language_prompts SET language_name = '英文' WHERE language_code = 'en'")
-        cursor.execute("UPDATE language_prompts SET language_name = '日文' WHERE language_code = 'jp'")
-        cursor.execute("UPDATE language_prompts SET color = '#8FA3A6' WHERE language_code = 'en' AND (color IS NULL OR color = '')")
-        cursor.execute("UPDATE language_prompts SET color = '#D4A5A5' WHERE language_code = 'jp' AND (color IS NULL OR color = '')")
-        
-        cursor.execute("UPDATE language_prompts SET language_code = 'jp' WHERE language_code = 'ja'")
-        cursor.execute("UPDATE processing_history SET doc_language = 'jp' WHERE doc_language = 'ja'")
-        cursor.execute("UPDATE processing_history SET model_endpoint = 'jp' WHERE model_endpoint = 'ja'")
-        conn.commit()
+    default_prompts = [
+        ("jp", "日文", ocr_template.format(lang="日文"), trans_template.format(lang="日文"), "#D4A5A5"),
+        ("en", "英文", ocr_template.format(lang="英文"), trans_template.format(lang="英文"), "#8FA3A6"),
+        ("de", "德文", ocr_template.format(lang="德文"), trans_template.format(lang="德文"), "#A8C5B5"),
+        ("fr", "法文", ocr_template.format(lang="法文"), trans_template.format(lang="法文"), "#B5A8C5"),
+        ("ru", "俄文", ocr_template.format(lang="俄文"), trans_template.format(lang="俄文"), "#C5A8A8"),
+        ("es", "西班牙文", ocr_template.format(lang="西班牙文"), trans_template.format(lang="西班牙文"), "#A8B5C5"),
+    ]
+    
+    for code, name, ocr, trans, color in default_prompts:
+        cursor.execute(
+            "INSERT OR IGNORE INTO language_prompts (language_code, language_name, ocr_prompt, translate_prompt, color, created_at, updated_at) VALUES (?, ?, ?, ?, ?, datetime('now', '+8 hours'), datetime('now', '+8 hours'))",
+            (code, name, ocr, trans, color)
+        )
+    
+    cursor.execute("UPDATE language_prompts SET language_name = '日文' WHERE language_code = 'jp'")
+    cursor.execute("UPDATE language_prompts SET language_name = '英文' WHERE language_code = 'en'")
+    cursor.execute("UPDATE language_prompts SET language_name = '德文' WHERE language_code = 'de'")
+    cursor.execute("UPDATE language_prompts SET language_name = '法文' WHERE language_code = 'fr'")
+    cursor.execute("UPDATE language_prompts SET language_name = '俄文' WHERE language_code = 'ru'")
+    cursor.execute("UPDATE language_prompts SET language_name = '西班牙文' WHERE language_code = 'es'")
+    
+    cursor.execute("UPDATE language_prompts SET color = '#D4A5A5' WHERE language_code = 'jp' AND (color IS NULL OR color = '')")
+    cursor.execute("UPDATE language_prompts SET color = '#8FA3A6' WHERE language_code = 'en' AND (color IS NULL OR color = '')")
+    cursor.execute("UPDATE language_prompts SET color = '#A8C5B5' WHERE language_code = 'de' AND (color IS NULL OR color = '')")
+    cursor.execute("UPDATE language_prompts SET color = '#B5A8C5' WHERE language_code = 'fr' AND (color IS NULL OR color = '')")
+    cursor.execute("UPDATE language_prompts SET color = '#C5A8A8' WHERE language_code = 'ru' AND (color IS NULL OR color = '')")
+    cursor.execute("UPDATE language_prompts SET color = '#A8B5C5' WHERE language_code = 'es' AND (color IS NULL OR color = '')")
+    
+    cursor.execute("UPDATE language_prompts SET language_code = 'jp' WHERE language_code = 'ja'")
+    cursor.execute("UPDATE processing_history SET doc_language = 'jp' WHERE doc_language = 'ja'")
+    cursor.execute("UPDATE processing_history SET model_endpoint = 'jp' WHERE model_endpoint = 'ja'")
+    
+    cursor.execute("UPDATE language_prompts SET ocr_prompt = ?, translate_prompt = ? WHERE language_code = 'jp'", (ocr_template.format(lang="日文"), trans_template.format(lang="日文")))
+    cursor.execute("UPDATE language_prompts SET ocr_prompt = ?, translate_prompt = ? WHERE language_code = 'en'", (ocr_template.format(lang="英文"), trans_template.format(lang="英文")))
+    cursor.execute("UPDATE language_prompts SET ocr_prompt = ?, translate_prompt = ? WHERE language_code = 'de'", (ocr_template.format(lang="德文"), trans_template.format(lang="德文")))
+    cursor.execute("UPDATE language_prompts SET ocr_prompt = ?, translate_prompt = ? WHERE language_code = 'fr'", (ocr_template.format(lang="法文"), trans_template.format(lang="法文")))
+    cursor.execute("UPDATE language_prompts SET ocr_prompt = ?, translate_prompt = ? WHERE language_code = 'ru'", (ocr_template.format(lang="俄文"), trans_template.format(lang="俄文")))
+    cursor.execute("UPDATE language_prompts SET ocr_prompt = ?, translate_prompt = ? WHERE language_code = 'es'", (ocr_template.format(lang="西班牙文"), trans_template.format(lang="西班牙文")))
+    
+    conn.commit()
     
     conn.close()
 except Exception:
