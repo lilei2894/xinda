@@ -66,7 +66,8 @@ async def get_history(
                 "upload_time": record.upload_time.isoformat(),
                 "content_title": record.content_title,
                 "doc_language": record.doc_language,
-                "language_color": _get_lang_color(record.doc_language, db) if record.doc_language else None
+                "model_endpoint": record.model_endpoint,
+                "language_color": _get_lang_color(record.doc_language if record.doc_language and record.doc_language != 'auto' else record.model_endpoint, db)
             }
             for record in records
         ],

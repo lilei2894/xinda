@@ -109,6 +109,8 @@ async def update_language_prompt(language_code: str, data: LanguagePromptUpdate,
     db.commit()
     db.refresh(prompt)
     
+    await update_language_detection_prompt(db)
+    
     return prompt
 
 @router.delete("/{language_code}")
@@ -163,7 +165,7 @@ async def update_language_detection_prompt(db: Session):
         return
     
     language_codes = [p.language_code for p in prompts]
-    detection_prompt = f'仅输出语言代码：{chr(32).join(language_codes)}'
+    detection_prompt = '仅输出语言代码：' + ' '.join(language_codes)
     
     config = db.query(AppConfig).filter(AppConfig.key == 'language_detection_prompt').first()
     if config:
@@ -173,10 +175,15 @@ async def update_language_detection_prompt(db: Session):
         db.add(config)
     db.commit()
 
-@router.get("/detection")
+@router.post('/detection/update')
+async def force_update_detection_prompt(db: Session = Depends(get_db)):
+    await update_language_detection_prompt(db)
+    return {'message': 'Language detection prompt updated'}
+
+@router.get('/detection')
 async def get_language_detection_prompt(db: Session = Depends(get_db)):
-    config = db.query(AppConfig).filter(AppConfig.key == "language_detection_prompt").first()
+    config = db.query(AppConfig).filter(AppConfig.key == 'language_detection_prompt').first()
     if not config:
         await update_language_detection_prompt(db)
-        config = db.query(AppConfig).filter(AppConfig.key == "language_detection_prompt").first()
-    return {"prompt": config.value if config else ""}
+        config = db.query(AppConfig).filter(AppConfig.key == 'language_detection_prompt').first()
+    return {'prompt': config.value if config else ''}

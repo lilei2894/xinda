@@ -157,7 +157,7 @@ export default function SettingsPanel({ onOpenModelSettings, onOpenPromptSetting
             onChange={handleDocLanguageChange}
             options={[
               ...(config?.doc_language && config.doc_language !== 'auto' 
-                ? [{ value: 'auto', label: `自动检测（${config.doc_language.toUpperCase()}）` }]
+                ? [{ value: 'auto', label: `自动检测（${languages.find(l => l.language_code === config.doc_language)?.language_name || config.doc_language.toUpperCase()}）` }]
                 : [{ value: 'auto', label: '-- 自动检测 --' }]
               ),
               ...languages.map((lang) => ({

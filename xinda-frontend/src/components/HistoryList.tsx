@@ -151,22 +151,22 @@ export default function HistoryList() {
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-500 text-left" style={{ maxWidth: '20em' }}>
                           <div className="flex items-center gap-1">
-                            {record.doc_language && record.doc_language !== 'auto' && (
-                              <span 
-                                className="px-1.5 py-0.5 text-xs font-medium rounded"
-                                style={{ 
-                                  backgroundColor: record.language_color || '#3B82F6',
-                                  color: 'white'
-                                }}
-                              >
-                                {record.doc_language.toUpperCase()}
-                              </span>
-                            )}
-                            <span className="truncate" title={record.content_title || ''}>
-                              {record.content_title || '-'}
-                            </span>
-                          </div>
-                        </td>
+                             {(record.doc_language && record.doc_language !== 'auto' ? record.doc_language : record.model_endpoint) && (
+                               <span 
+                                 className="px-1.5 py-0.5 text-xs font-medium rounded"
+                                 style={{ 
+                                   backgroundColor: record.language_color || '#3B82F6',
+                                   color: 'white'
+                                 }}
+                               >
+                                 {(record.doc_language && record.doc_language !== 'auto' ? record.doc_language : record.model_endpoint).toUpperCase()}
+                               </span>
+                             )}
+                             <span className="truncate" title={record.content_title || ''}>
+                               {record.content_title || '-'}
+                             </span>
+                           </div>
+                         </td>
                         <td className="py-3 pl-2 pr-1 text-sm text-gray-500 text-right">
                           {record.total_pages || '-'}
                         </td>

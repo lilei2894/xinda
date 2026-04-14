@@ -109,7 +109,7 @@ class OCRService:
         img_base64 = base64.b64encode(buffered.getvalue()).decode()
         return img_base64
     
-def detect_language(self, image_base64):
+    def detect_language(self, image_base64):
         print('[DETECT-LANG] Starting...')
         from models.database import SessionLocal
         db = SessionLocal()
@@ -148,11 +148,17 @@ def detect_language(self, image_base64):
             response.raise_for_status()
             result = response.json()
             print(f'[DETECT-LANG] Response: {result}')
-            detected = result['choices'][0]['message']['content'].strip().lower().strip('\"').strip('\")
+            content = result['choices'][0]['message']['content']
+            detected = content.strip().lower()
             print(f'[DETECT-LANG] Raw detected: {detected}')
         except Exception as e:
             print(f'[DETECT-LANG] API error: {e}')
             return 'en'
+        
+        if detected == 'ja':
+            detected = 'jp'
+        elif detected == 'zh':
+            detected = 'en'
         
         from models.database import LanguagePrompt
         db = SessionLocal()

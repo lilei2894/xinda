@@ -220,7 +220,7 @@ export default function ResultPage() {
   const prevResultRef = useRef<any>(null);
   
   useEffect(() => {
-    if (result && providers.length > 0) {
+    if (result && providers.length > 0 && languages.length > 0) {
       const prevResult = prevResultRef.current;
       const resultChanged = !prevResult || 
         prevResult.ocr_model_id !== result.ocr_model_id ||
@@ -237,7 +237,8 @@ export default function ResultPage() {
         const detected = result.model_endpoint;
         
         const isValidLanguage = languages.some(l => l.language_code === detected);
-        setDetectedLanguage(isValidLanguage ? detected : 'auto');
+        const finalDetected = isValidLanguage ? detected : 'en';
+        setDetectedLanguage(finalDetected);
         setDocLanguage(storedDocLanguage);
         
         const models = flattenModelsForType(providers, 'both');
@@ -255,7 +256,7 @@ export default function ResultPage() {
         }
       }
     }
-  }, [result, providers]);
+  }, [result, providers, languages]);
 
   const handlePageChange = (page: number) => {
     if (page >= 1 && page <= totalPages) {
@@ -589,7 +590,7 @@ export default function ResultPage() {
                 }
               }}
               options={[
-                { value: 'auto', label: languages.find(l => l.language_code === detectedLanguage)?.language_name ? `${languages.find(l => l.language_code === detectedLanguage)?.language_name}（自动检测）` : '自动检测' },
+                { value: 'auto', label: languages.find(l => l.language_code === detectedLanguage)?.language_name ? `自动检测（${languages.find(l => l.language_code === detectedLanguage)?.language_name}）` : '自动检测' },
                 ...languages.map((lang) => ({
                   value: lang.language_code,
                   label: lang.language_name

@@ -43,6 +43,7 @@ def process_file_background(record_id: str, file_path: str, file_type: str, ocr_
         record.status = "processing"
         
         if language == "auto":
+            print(f"[LANG-DEBUG] Starting auto-detect with model={ocr_model}")
             try:
                 ocr_service_temp = OCRService(model=ocr_model, endpoint=endpoint, api_key=ocr_api_key)
                 if file_type == "pdf":
@@ -54,15 +55,23 @@ def process_file_background(record_id: str, file_path: str, file_type: str, ocr_
                 else:
                     img = Image.open(file_path)
                 img_base64 = ocr_service_temp.image_to_base64(img)
+                print(f"[LANG-DEBUG] Image prepared, calling detect_language...")
                 detected = ocr_service_temp.detect_language(img_base64)
-                print(f"[LANGUAGE DETECT] Detected: {detected}")
+                print(f"[LANG-DEBUG] Detect SUCCESS: {detected}")
                 language = detected
                 record.model_endpoint = detected
-                record.doc_language = detected
+                record.doc_language = "auto"
                 db.commit()
+                print(f"[LANG-DEBUG] Saved: model_endpoint={detected}, doc_language=auto")
             except Exception as e:
-                print(f"[LANGUAGE DETECT ERROR] {e}")
-                language = "auto"
+                print(f"[LANG-DEBUG] Detect FAILED: {e}")
+                import traceback
+                traceback.print_exc()
+                language = "jp"
+                record.model_endpoint = "jp"
+                record.doc_language = "auto"
+                db.commit()
+                print(f"[LANG-DEBUG] Fallback to jp")
         
         db.commit()
         
