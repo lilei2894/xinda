@@ -14,10 +14,19 @@ from models.database import get_db, ProcessingHistory, Provider
 from services.ocr_service import OCRService
 from services.translate_service import TranslateService
 from services.stream_store import set_stream_data, append_stream_text, get_stream_page_text, clear_stream_data, set_stream_status
+import fitz
+from PIL import Image
+from io import BytesIO
 
 router = APIRouter()
 
 UPLOAD_DIR = os.getenv("UPLOAD_DIR", "./uploads")
+
+def resolve_file_path(file_path: str) -> str:
+    if os.path.isabs(file_path):
+        return file_path
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(base_dir, file_path)
 MAX_FILE_SIZE = int(os.getenv("MAX_FILE_SIZE", "52428800"))
 MAX_PDF_PAGES = int(os.getenv("MAX_PDF_PAGES", "500"))
 
@@ -60,37 +69,6 @@ def process_file_background(record_id: str, file_path: str, file_type: str, ocr_
         set_stream_status(record_id, "processing")
         record.status = "processing"
         
-        if language == "auto":
-            print(f"[LANG-DEBUG] Starting auto-detect with model={ocr_model}")
-            try:
-                ocr_service_temp = OCRService(model=ocr_model, endpoint=endpoint, api_key=ocr_api_key)
-                if file_type == "pdf":
-                    doc = fitz.open(file_path)
-                    page_obj = doc[0]
-                    pix = page_obj.get_pixmap()
-                    img = Image.open(BytesIO(pix.tobytes("png")))
-                    doc.close()
-                else:
-                    img = Image.open(file_path)
-                img_base64 = ocr_service_temp.image_to_base64(img)
-                print(f"[LANG-DEBUG] Image prepared, calling detect_language...")
-                detected = ocr_service_temp.detect_language(img_base64)
-                print(f"[LANG-DEBUG] Detect SUCCESS: {detected}")
-                language = detected
-                record.model_endpoint = detected
-                record.doc_language = "auto"
-                db.commit()
-                print(f"[LANG-DEBUG] Saved: model_endpoint={detected}, doc_language=auto")
-            except Exception as e:
-                print(f"[LANG-DEBUG] Detect FAILED: {e}")
-                import traceback
-                traceback.print_exc()
-                language = "en"
-                record.model_endpoint = "en"
-                record.doc_language = "auto"
-                db.commit()
-                print(f"[LANG-DEBUG] Fallback to en")
-        
         db.commit()
         
         ocr_service = OCRService(model=ocr_model, endpoint=endpoint, language=language, api_key=ocr_api_key)
@@ -115,6 +93,15 @@ def process_file_background(record_id: str, file_path: str, file_type: str, ocr_
                     doc = fitz.open(file_path)
                     for idx in range(doc.page_count):
                         page_num = idx + 1
+                        
+                        with lock:
+                            prev_ocr_text = ocr_done.get(page_num - 1, '') if page_num > 1 else None
+                        
+                        if prev_ocr_text:
+                            lines = prev_ocr_text.strip().split('\n')
+                            non_empty_lines = [l.strip() for l in lines if l.strip()]
+                            if non_empty_lines:
+                                prev_ocr_text = '\n'.join(non_empty_lines[-3:])
                         
                         local_db = SessionLocal()
                         try:
@@ -153,7 +140,7 @@ def process_file_background(record_id: str, file_path: str, file_type: str, ocr_
                             def ocr_callback(chunk, full_text):
                                 append_stream_text(record_id, 'ocr', chunk, page_num)
                             
-                            text = current_ocr_service.call_vision_model_stream(img_base64, ocr_callback)
+                            text = current_ocr_service.call_vision_model_stream(img_base64, ocr_callback, prev_ocr_text)
                             with lock:
                                 ocr_done[page_num] = text
                                 ocr_page_complete[page_num] = True
@@ -169,7 +156,7 @@ def process_file_background(record_id: str, file_path: str, file_type: str, ocr_
                     def ocr_callback(chunk, full_text):
                         append_stream_text(record_id, 'ocr', chunk, 1)
                     
-                    text = ocr_service.call_vision_model_stream(img_base64, ocr_callback)
+                    text = ocr_service.call_vision_model_stream(img_base64, ocr_callback, None)
                     with lock:
                         ocr_done[1] = text
                         ocr_page_complete[1] = True
@@ -202,6 +189,14 @@ def process_file_background(record_id: str, file_path: str, file_type: str, ocr_
                 for page_num in pending_pages:
                     with lock:
                         page_content = ocr_done.get(page_num, '')
+                        prev_translated = trans_done.get(page_num - 1, '') if page_num > 1 else None
+                    
+                    prev_translated_text = None
+                    if prev_translated:
+                        lines = prev_translated.strip().split('\n')
+                        non_empty_lines = [l.strip() for l in lines if l.strip() and not l.strip().startswith('===')]
+                        if non_empty_lines:
+                            prev_translated_text = '\n'.join(non_empty_lines[-3:])
                     
                     local_db = SessionLocal()
                     try:
@@ -237,7 +232,7 @@ def process_file_background(record_id: str, file_path: str, file_type: str, ocr_
                                 with lock:
                                     trans_done[page_num] = full_text
                             
-                            translated = current_trans_service.translate_to_chinese_stream(page_content, trans_callback)
+                            translated = current_trans_service.translate_to_chinese_stream(page_content, trans_callback, prev_translated_text)
                         except Exception as e:
                             translated = f"Error: {str(e)}"
                     else:
@@ -498,6 +493,40 @@ async def process_file(
     record.ocr_model_id = ocr_model
     record.translate_model_id = translate_model
     record.doc_language = language
+    
+    # 如果是自动检测，在主线程中检测语言
+    detected_language = None
+    if language == "auto":
+        print(f"[LANG-DEBUG] API: Starting auto-detect with model={ocr_model_name}")
+        try:
+            ocr_service_temp = OCRService(model=ocr_model_name, endpoint=endpoint, api_key=ocr_api_key)
+            if record.file_type == "pdf":
+                doc = fitz.open(resolve_file_path(record.file_path))
+                page_obj = doc[0]
+                pix = page_obj.get_pixmap()
+                img = Image.open(BytesIO(pix.tobytes("png")))
+                doc.close()
+            else:
+                img = Image.open(resolve_file_path(record.file_path))
+            img_base64 = ocr_service_temp.image_to_base64(img)
+            detected_language = ocr_service_temp.detect_language(img_base64)
+            print(f"[LANG-DEBUG] API: Detect SUCCESS: {detected_language}")
+            language = detected_language
+            record.model_endpoint = detected_language
+            record.doc_language = "auto"
+        except Exception as e:
+            print(f"[LANG-DEBUG] API: Detect FAILED: {e}")
+            import traceback
+            traceback.print_exc()
+            record.status = "language_detection_failed"
+            db.commit()
+            return {
+                "id": record.id,
+                "status": "language_detection_failed",
+                "message": "自动检测语言失败，请手动选择语种",
+                "require_language_selection": True
+            }
+    
     db.commit()
     
     upload_executor.submit(

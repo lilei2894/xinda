@@ -180,9 +180,9 @@ class TranslateService:
             url = f"{base}/chat/completions" if base.endswith('/v1') else f"{base}/v1/chat/completions"
             
             if use_translated:
-                prompt_content = f"请根据以下文档内容，生成一个简短的标题（不超过20个字），仅输出标题，不要任何解释：\n\n{sample_text}"
+                prompt_content = f"请根据以下文档内容，生成一个简短的中文标题（不超过20个字），仅输出标题，不要任何解释：\n\n{sample_text}"
             else:
-                prompt_content = f"请根据以下OCR识别的外语文档内容，生成一个简短的标题（不超过20个字），仅输出标题，不要任何解释：\n\n{sample_text}"
+                prompt_content = f"请根据以下OCR识别的外语文档内容，生成一个简短的中文标题（不超过20个字），仅输出标题，不要任何解释：\n\n{sample_text}"
             
             response = requests.post(
                 url,
@@ -221,7 +221,7 @@ class TranslateService:
                 return line
         return None
     
-    def translate_to_chinese_stream(self, source_text, callback):
+    def translate_to_chinese_stream(self, source_text, callback, prev_translated_text=None):
         from models.database import SessionLocal
         db = SessionLocal()
         try:
@@ -229,12 +229,17 @@ class TranslateService:
         finally:
             db.close()
         
+        if prev_translated_text:
+            context_prompt = f"{prompt}\n\n【格式参考】为方便对齐格式与内容，将上一页的最后一部分供你参考：\n{prev_translated_text}"
+        else:
+            context_prompt = prompt
+        
         base = self.api_endpoint.rstrip('/')
         url = f"{base}/chat/completions" if base.endswith('/v1') else f"{base}/v1/chat/completions"
         payload = {
             "model": self.model,
             "messages": [
-                {"role": "system", "content": prompt},
+                {"role": "system", "content": context_prompt},
                 {"role": "user", "content": source_text}
             ],
             "max_tokens": 4000,

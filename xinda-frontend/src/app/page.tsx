@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import FileUpload from '@/components/FileUpload';
 import HistoryList from '@/components/HistoryList';
@@ -43,7 +43,6 @@ export default function Home() {
       return;
     }
 
-    // Start processing in background (don't wait for response)
     fetch(
       `${API_BASE}/upload/${uploadedFileId}/process?ocr_model=${encodeURIComponent(ocrModel)}&translate_model=${encodeURIComponent(translateModel)}&endpoint=${encodeURIComponent(endpoint)}&language=${encodeURIComponent(docLanguage)}`,
       { method: 'POST' }
@@ -51,7 +50,6 @@ export default function Home() {
       console.error('Failed to start processing:', err);
     });
 
-    // Navigate immediately
     router.push(`/result/${uploadedFileId}`);
   }, [uploadedFileId, router]);
 

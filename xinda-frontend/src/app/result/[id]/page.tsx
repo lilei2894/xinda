@@ -65,6 +65,8 @@ export default function ResultPage() {
   const [titleInput, setTitleInput] = useState('');
   const [pageInput, setPageInput] = useState<string>('');
   const [isEditingPage, setIsEditingPage] = useState(false);
+  const [showLanguageSelect, setShowLanguageSelect] = useState(false);
+  const [isDetecting, setIsDetecting] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const imageViewerRef = useRef<{ reset: () => void; zoomIn: () => void; zoomOut: () => void } | null>(null);
   const ocrScrollRef = useRef<HTMLDivElement>(null);
@@ -86,6 +88,18 @@ export default function ResultPage() {
       if (!isMountedRef.current) return;
       setResult(data);
       setError(null);
+      
+      if (data.status === 'language_detection_failed') {
+        setShowLanguageSelect(true);
+        setIsDetecting(false);
+      } else if ((data.status === 'pending' || data.status === 'processing') && data.doc_language === 'auto' && !data.model_endpoint) {
+        setIsDetecting(true);
+        setShowLanguageSelect(false);
+      } else if (data.model_endpoint) {
+        setIsDetecting(false);
+        setShowLanguageSelect(false);
+        setDetectedLanguage(data.model_endpoint);
+      }
       
       const dataTotalPages = data.total_pages ? parseInt(data.total_pages) : 1;
       const dataOcrComplete = getCompletedPages(data.ocr_text);
@@ -506,6 +520,17 @@ export default function ResultPage() {
 
   return (
     <div className="h-screen flex flex-col overflow-hidden">
+      {isDetecting && !showLanguageSelect && (
+        <div className="bg-blue-50 border-b border-blue-300 px-4 py-2 flex items-center gap-2 shrink-0">
+          <div className="animate-spin h-4 w-4 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+          <span className="text-blue-800 text-sm">识别语种中...</span>
+        </div>
+      )}
+      {showLanguageSelect && !isDetecting && (
+        <div className="bg-red-50 border-b border-red-300 px-4 py-2 shrink-0">
+          <span className="text-red-800 text-sm">语种识别失败，请手动选择语种</span>
+        </div>
+      )}
       <header className="bg-white shadow-sm shrink-0">
         <div className="px-4 py-3">
           <div className="flex items-center justify-between">
@@ -582,6 +607,11 @@ export default function ResultPage() {
                   try {
                     await updateRecordLanguage(id, val);
                     setDocLanguage(val);
+                    setShowLanguageSelect(false);
+                    const actualLanguage = val === 'auto' ? detectedLanguage : val;
+                    if (selectedOcrModel && selectedTransModel) {
+                      await continueProcessing(id, selectedOcrModel, selectedTransModel, getEndpointFromModel(selectedOcrModel), actualLanguage);
+                    }
                   } catch (err) {
                     console.error('Failed to save language:', err);
                   } finally {
@@ -684,6 +714,8 @@ export default function ResultPage() {
                 setSelectedOcrModel(val);
                 try {
                   await updateRecordModel(id, val, undefined);
+                  const actualLanguage = docLanguage === 'auto' ? detectedLanguage : docLanguage;
+                  await continueProcessing(id, val, selectedTransModel, getEndpointFromModel(val), actualLanguage);
                 } catch (err) {
                   console.error('Failed to save OCR model:', err);
                 }
@@ -760,6 +792,8 @@ export default function ResultPage() {
                 setSelectedTransModel(val);
                 try {
                   await updateRecordModel(id, undefined, val);
+                  const actualLanguage = docLanguage === 'auto' ? detectedLanguage : docLanguage;
+                  await continueProcessing(id, selectedOcrModel, val, getEndpointFromModel(selectedOcrModel), actualLanguage);
                 } catch (err) {
                   console.error('Failed to save translation model:', err);
                 }

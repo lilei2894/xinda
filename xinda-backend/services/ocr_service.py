@@ -255,13 +255,18 @@ class OCRService:
         
         return "\n\n".join(all_text)
     
-    def call_vision_model_stream(self, image_base64, callback):
+    def call_vision_model_stream(self, image_base64, callback, prev_ocr_text=None):
         from models.database import SessionLocal
         db = SessionLocal()
         try:
             prompt = prompts_module.get_ocr_prompt(self.language, db)
         finally:
             db.close()
+        
+        if prev_ocr_text:
+            context_prompt = f"{prompt}\n\n【格式参考】为方便对齐格式与内容，将上一页的最后一部分供你参考：\n{prev_ocr_text}"
+        else:
+            context_prompt = prompt
         
         base = self.api_endpoint.rstrip('/')
         url = f"{base}/chat/completions" if base.endswith('/v1') else f"{base}/v1/chat/completions"
@@ -271,7 +276,7 @@ class OCRService:
                 {
                     "role": "user",
                     "content": [
-                        {"type": "text", "text": prompt},
+                        {"type": "text", "text": context_prompt},
                         {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_base64}"}}
                     ]
                 }
