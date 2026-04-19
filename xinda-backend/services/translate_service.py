@@ -180,9 +180,9 @@ class TranslateService:
             url = f"{base}/chat/completions" if base.endswith('/v1') else f"{base}/v1/chat/completions"
             
             if use_translated:
-                prompt_content = f"请根据以下文档内容，生成一个简短的中文标题（不超过20个字），仅输出标题，不要任何解释：\n\n{sample_text}"
+                prompt_content = f"请根据以下文档内容，生成一个简短的标题（需翻译为中文简体，不超过20个字），仅输出标题，不要任何解释：\n\n{sample_text}"
             else:
-                prompt_content = f"请根据以下OCR识别的外语文档内容，生成一个简短的中文标题（不超过20个字），仅输出标题，不要任何解释：\n\n{sample_text}"
+                prompt_content = f"请根据以下OCR识别的外语内容，生成一个简短的中文标题（需翻译为中文简体，不超过20个字），仅输出标题，不要任何解释：\n\n{sample_text}"
             
             response = requests.post(
                 url,
