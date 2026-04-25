@@ -1,8 +1,8 @@
 # 外文档案文献处理工作台
 
-项目代号：**xinda**
+项目代号：**信达 XINDA**
 
-一个基于 Web 的外文文档（支持日文、英文、德文、法文等）OCR 识别和翻译工具。
+一个基于 Web 的外文文档（如英文、日文、法文、俄文等）OCR 识别和翻译工具。
 
 ## ⚠️ 重要说明
 
@@ -45,7 +45,7 @@
 
 ### AI 模型（需自行配置）
 
-本系统支持 Ollama、OpenAI、阿里云、DeepSeek、Google 等多种 AI 模型供应商。推荐使用支持视觉能力的模型进行 OCR 识别。
+本系统支持 Ollama、OpenAI、阿里云、DeepSeek、Google 等多种 AI 模型供应商（需支持OpenAI协议）。请使用支持视觉能力的模型进行 OCR 识别。
 
 详细模型选择建议请参考 [使用指南](xinda-frontend/public/usage.md) 中的模型配置说明。
 
